@@ -7,7 +7,12 @@ directories:
 files:
   - out/**/*
   - package.json
+# node-pty ships N-API prebuilds that work in Electron as-is; no rebuild (and no C++ toolchain) needed.
+npmRebuild: false
 asar: true
+# node-pty loads native binaries and spawns helper executables; they must live on disk.
+asarUnpack:
+  - "**/node_modules/node-pty/**"
 win:
   target:
     - target: nsis

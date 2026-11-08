@@ -17,27 +17,44 @@ pnpm install
 pnpm dev          # abre Lenz con recarga en caliente
 ```
 
-| Comando                                | Qué hace                                     |
-| -------------------------------------- | -------------------------------------------- |
-| `pnpm lint`                            | Lint y formato (Biome)                       |
-| `pnpm format`                          | Formatea todo                                |
-| `pnpm typecheck`                       | Revisa tipos                                 |
-| `pnpm build`                           | Compila a `apps/desktop/out`                 |
-| `pnpm --filter @lenz/desktop dist:win` | Instalador `.exe` en `apps/desktop/release/` |
-| `pnpm --filter @lenz/desktop dist:mac` | `.dmg` (hay que correrlo en una Mac)         |
+| Comando                                | Qué hace                                          |
+| -------------------------------------- | ------------------------------------------------- |
+| `pnpm lint`                            | Lint y formato (Biome)                            |
+| `pnpm format`                          | Formatea todo                                     |
+| `pnpm typecheck`                       | Revisa tipos                                      |
+| `pnpm test`                            | Pruebas (incluye el daemon con terminales reales) |
+| `pnpm build`                           | Compila a `apps/desktop/out`                      |
+| `pnpm --filter @lenz/desktop dist:win` | Instalador `.exe` en `apps/desktop/release/`      |
+| `pnpm --filter @lenz/desktop dist:mac` | `.dmg` (hay que correrlo en una Mac)              |
 
 El CI (GitHub Actions) genera el `.exe` y el `.dmg` en cada push a `main`; se descargan desde los _artifacts_ del workflow.
 
 > **Mac:** la app no está firmada. La primera vez ábrela con clic derecho → Abrir.
 > **Windows:** SmartScreen avisa porque no hay certificado; "Más información" → "Ejecutar de todas formas".
 
+## Atajos
+
+| Acción                       | Windows                                       | Mac      |
+| ---------------------------- | --------------------------------------------- | -------- |
+| Nueva pestaña                | Ctrl+Shift+T                                  | ⌘T       |
+| Dividir a la derecha         | Ctrl+Shift+D                                  | ⌘D       |
+| Dividir hacia abajo          | Ctrl+Shift+E                                  | ⇧⌘D      |
+| Cerrar panel                 | Ctrl+Shift+W                                  | ⌘W       |
+| Siguiente / anterior pestaña | Ctrl+Tab / Ctrl+Shift+Tab                     | ⌃⇥ / ⌃⇧⇥ |
+| Copiar                       | Ctrl+C con texto seleccionado, o Ctrl+Shift+C | ⌘C       |
+| Pegar                        | Ctrl+V o Ctrl+Shift+V                         | ⌘V       |
+
 ## Estructura
 
 ```
-apps/desktop/   App Electron (main, preload, renderer React)
-packages/       daemon, CLI y protocolo (llegan en las siguientes fases)
-lenz-brand/     Kit de marca
-docs/           Análisis y plan
+apps/desktop/        App Electron (main, preload, renderer React)
+packages/daemon/     lenzd: mantiene vivas las terminales aunque cierres Lenz
+packages/protocol/   Mensajes, endpoint y cliente de lenzd
+lenz-brand/          Kit de marca
+docs/                Análisis y plan
 ```
+
+Cerrar la ventana **no** cierra las terminales: siguen corriendo en `lenzd` y Lenz las recupera al abrirse. `lenzd` se apaga solo cuando no quedan terminales.
+Logs: `logs/` dentro de la carpeta de datos (`%APPDATA%\Lenz` en Windows, `~/Library/Application Support/Lenz` en Mac; en desarrollo, `Lenz Dev`).
 
 Plan y fases: [docs/02-plan.md](docs/02-plan.md).

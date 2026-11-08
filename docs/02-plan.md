@@ -108,13 +108,25 @@ Un perfil = qué comando lanzar + qué variables de entorno inyectar.
 
 **Listo cuando:** cualquiera del equipo instala Lenz y abre una ventana con la marca.
 
+✅ Hecha (2026-11-08).
+
 ### Fase 1 — Terminales que no mueren
 
 - `lenzd`: crear/escribir/redimensionar/cerrar PTYs, guardar su pantalla.
-- Proyectos, tabs, splits; xterm.js con WebGL.
+- Proyectos, tabs, splits; xterm.js.
 - Cerrar y reabrir la app sin perder terminales.
 
 **Listo cuando:** abro 4 terminales en splits, cierro Lenz, lo reabro y siguen ahí.
+
+✅ Hecha (2026-11-08). Notas de implementación:
+
+- `lenzd` es el propio ejecutable de Lenz en modo Node (`ELECTRON_RUN_AS_NODE`), lanzado desacoplado. Escucha en un named pipe (Windows) o socket Unix (Mac) con JSON por líneas; protocolo en `packages/protocol`.
+- Cada terminal tiene un espejo `@xterm/headless`; al reconectar, la app recibe una foto de la pantalla y luego sólo lo nuevo (números de secuencia para no duplicar).
+- El layout (proyectos, tabs, splits) se guarda en `workspace.json` en la carpeta de datos de la app. Si una terminal ya no existe (reinicio del PC), el pane abre una shell nueva en su carpeta.
+- `lenzd` se cierra solo tras 60 s sin terminales ni ventanas.
+- Desarrollo usa su propia carpeta de datos (`Lenz Dev`) y su propio `lenzd`. `LENZ_USER_DATA` permite aislar pruebas.
+- **WebGL desactivado:** `@xterm/addon-webgl` dibujaba los caracteres con una fuente por defecto en Electron 45 (con cualquier `fontFamily`). Se usa el renderizador DOM, que se ve bien. Revisar en una versión futura de xterm/Electron.
+- **Actualizar la app reinicia `lenzd`** (si cambia su código) y eso cierra las terminales abiertas. Resolver en fase 7 (traspaso de terminales entre versiones del daemon).
 
 ### Fase 2 — Agentes y squads
 
@@ -161,3 +173,4 @@ Colaboración en equipo, RDP, app móvil, cloud, navegador embebido, plugins, Li
 - NVIDIA: cómo conectarlo (fase 2).
 - Firma de código: para Mac, sin cuenta de Apple Developer ($99/año) la app sale como "no verificada" y hay que abrirla con clic derecho → Abrir. En Windows sin certificado, SmartScreen avisa. Para uso interno se puede vivir con eso.
 - ¿Repo en GitHub de quién? (para CI y releases).
+- Probar la fase 1 en Mac (sólo se verificó en Windows; el CI corre las pruebas del daemon en ambos).

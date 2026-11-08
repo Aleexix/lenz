@@ -12,9 +12,11 @@
     "dist": "pnpm --filter @lenz/desktop dist",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "test": "pnpm -r test"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.6"
+    "@biomejs/biome": "^2.6.6",
+    "vitest": "^5.1.0"
   }
 }
