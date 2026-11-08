@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/* Lenz brand tokens: see lenz-brand/BRAND.md */
+@theme {
+  --color-navy-950: #070e2b;
+  --color-navy-900: #0d1a45;
+  --color-navy-800: #1a2f6e;
+  --color-navy-700: #26408c;
+  --color-electric-600: #2f6bf0;
+  --color-electric-400: #5b9bff;
+  --color-ice: #eef3fd;
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-navy-950 font-sans text-ice antialiased select-none;
+    margin: 0;
+    overflow: hidden;
+  }
+}
+
+@utility drag-region {
+  -webkit-app-region: drag;
+}
+
+@utility no-drag {
+  -webkit-app-region: no-drag;
+}

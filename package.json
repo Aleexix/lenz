@@ -1,0 +1,20 @@
+{
+  "name": "lenz",
+  "private": true,
+  "description": "Lenz: el sexto sentido de tu código. ADE de escritorio para orquestar squads de agentes de IA.",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @lenz/desktop dev",
+    "build": "pnpm --filter @lenz/desktop build",
+    "dist": "pnpm --filter @lenz/desktop dist",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.6"
+  }
+}
