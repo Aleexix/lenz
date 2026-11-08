@@ -1,12 +1,15 @@
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { LenzRpcError, type MethodName } from '@lenz/protocol'
+import { type Events, LenzRpcError, type MethodName } from '@lenz/protocol'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { AppInfo, DaemonReply, Platform } from '../shared/app-info'
+import type { LaunchAgentRequest, ProfileInput } from '../shared/profiles'
 import type { Workspace } from '../shared/workspace'
+import { AgentLauncher } from './agent-launcher'
 import { enableDevToolsShortcut, installAppMenu } from './app-menu'
 import { DaemonManager } from './daemon-manager'
+import { ProfileStore } from './profile-store'
 import { WorkspaceStore } from './workspace-store'
 
 const NAVY_950 = '#070E2B'
@@ -29,6 +32,8 @@ function log(message: string): void {
 
 const daemon = new DaemonManager(home, join(__dirname, 'lenzd.js'), log)
 const workspaceStore = new WorkspaceStore(join(home, 'workspace.json'))
+const profiles = new ProfileStore(home)
+const launcher = new AgentLauncher(home)
 
 function broadcast(channel: string, ...args: unknown[]): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -37,10 +42,45 @@ function broadcast(channel: string, ...args: unknown[]): void {
 }
 
 daemon.on('status', (status) => broadcast('daemon:status', status))
-daemon.on('event', (name, payload) => broadcast('daemon:event', name, payload))
+daemon.on('event', (name, payload) => {
+  if (name === 'terminal.exit') launcher.forget((payload as Events['terminal.exit']).id)
+  broadcast('daemon:event', name, payload)
+})
 daemon.on('reconnected', () => broadcast('daemon:reconnected'))
 
+/** Runs `work` and reports failures as data: errors thrown across ipcMain.handle lose their message. */
+async function reply<T>(work: () => T | Promise<T>): Promise<DaemonReply<T>> {
+  try {
+    return { ok: true, result: await work() }
+  } catch (error) {
+    const code = error instanceof LenzRpcError ? error.code : 'failed'
+    return { ok: false, code, message: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+async function launchAgent(request: LaunchAgentRequest) {
+  const profile = profiles.get(request.profileId)
+  if (!profile) throw new Error('Ese perfil ya no existe')
+  const client = await daemon.getClient()
+  const apiKey = profile.kind === 'claude-subscription' ? undefined : profiles.apiKey(profile.id)
+  const { params, settingsFile } = await launcher.prepare(request, profile, apiKey, daemon.hookPort)
+  try {
+    const info = await client.request('terminal.create', params)
+    launcher.track(info.id, settingsFile)
+    log(`agent "${request.name}" started in ${info.id} with profile ${profile.id}`)
+    return info
+  } catch (error) {
+    launcher.discard(settingsFile)
+    throw error
+  }
+}
+
 function registerIpc(): void {
+  ipcMain.handle('profiles:list', () => reply(() => profiles.list()))
+  ipcMain.handle('profiles:save', (_event, input: ProfileInput) => reply(() => profiles.save(input)))
+  ipcMain.handle('profiles:delete', (_event, id: string) => reply(() => profiles.delete(id)))
+  ipcMain.handle('agent:launch', (_event, request: LaunchAgentRequest) => reply(() => launchAgent(request)))
+
   ipcMain.handle(
     'app:info',
     (): AppInfo => ({
@@ -51,6 +91,14 @@ function registerIpc(): void {
   )
 
   ipcMain.handle('daemon:status', () => daemon.status)
+
+  ipcMain.on('app:focus-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  })
 
   ipcMain.handle(
     'daemon:request',

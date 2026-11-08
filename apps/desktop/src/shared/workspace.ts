@@ -13,6 +13,17 @@ export interface TerminalPane {
   terminalId: string | null
   /** Folder for a fresh shell if the old terminal is gone (reboot, daemon restart). */
   cwd: string
+  /** Present when the pane runs an agent instead of a shell. */
+  agent?: PaneAgent
+}
+
+export interface PaneAgent {
+  name: string
+  profileId: string
+  /** Claude Code session; a pane whose terminal is gone resumes it. */
+  sessionId?: string
+  /** First message, sent once when the agent starts for the first time. */
+  prompt?: string
 }
 
 export interface SplitPane {

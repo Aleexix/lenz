@@ -91,12 +91,12 @@ Proyecto (un repo o carpeta, local o en una máquina SSH)
 
 Un perfil = qué comando lanzar + qué variables de entorno inyectar.
 
-| Perfil               | Cómo                                                                                                                   |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Claude (suscripción) | `claude` tal cual, con la sesión del usuario                                                                           |
-| z.ai                 | `claude` con `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` de z.ai (endpoint compatible con Anthropic)                 |
-| NVIDIA               | API compatible con OpenAI → hace falta un traductor (p. ej. LiteLLM) u otro agente que la hable. **Validar en fase 2** |
-| Personalizado        | URL + key + modelo                                                                                                     |
+| Perfil               | Cómo                                                                                                                                                                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude (suscripción) | `claude` tal cual, con la sesión del usuario                                                                                                                                                                                                              |
+| z.ai                 | `claude` con `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` de z.ai (endpoint compatible con Anthropic)                                                                                                                                                    |
+| NVIDIA               | Validado (2026-11-08): la API alojada (`integrate.api.nvidia.com`) sólo habla formato OpenAI. Opciones: un traductor local (LiteLLM, `nvd-claude-proxy`) y un perfil **Personalizado** apuntando a él, o un NIM autoalojado, que sí expone `/v1/messages` |
+| Personalizado        | URL + key + modelo                                                                                                                                                                                                                                        |
 
 ## Fases
 
@@ -137,6 +137,18 @@ Un perfil = qué comando lanzar + qué variables de entorno inyectar.
 
 **Listo cuando:** lanzo 3 Claude Code (uno con z.ai) y veo en el sidebar quién me necesita.
 
+✅ Hecha (2026-11-08). Notas de implementación:
+
+- Lenz lanza `claude --settings <archivo> --session-id <uuid> [tarea]`. El archivo (en `agents/` de la carpeta de datos) sólo trae **hooks HTTP** hacia `lenzd`; la configuración propia de Claude no se toca.
+- `lenzd` tiene un servidor HTTP local (127.0.0.1, puerto aleatorio) y un token por agente. Mapea los hooks: `UserPromptSubmit`/`PreToolUse` → Trabajando; `PermissionRequest` y `Notification(permission_prompt)` → Te necesita (las preguntas de `AskUserQuestion` muestran la pregunta); `Stop` → Listo; `StopFailure` → Error.
+- **OSC 7501** se lee del espejo headless de cada terminal y `lenzd` responde la pregunta `?`. En Windows, ConPTY descarta esa respuesta de entrada, así que los programas no reportan por OSC; ahí los hooks son la fuente. Los hooks mandan sobre OSC por 2 minutos.
+- "Listo" pasa a "Inactivo" cuando miras el agente (ventana enfocada + panel enfocado). Notificación del sistema si un agente queda bloqueado, termina o falla mientras miras otra cosa.
+- Si la terminal de un agente ya no existe (reinicio), el panel reanuda la conversación con `--resume <sessionId>`.
+- Perfiles en `profiles.json`; API keys cifradas con `safeStorage` (DPAPI / Keychain) en `secrets.json`. La key sólo existe descifrada en el proceso principal y en el entorno del agente.
+- Al lanzar un agente se quitan las variables que deja una sesión padre de Claude Code (`CLAUDECODE`, `CLAUDE_CODE_CHILD_SESSION`…); si no, Claude no guarda transcript y no se puede reanudar.
+- Verificado con Claude Code 2.1.319 real en Windows: trabajando → listo, pregunta → te necesita → listo, reanudar tras matar `lenzd`, y perfil z.ai (llega a z.ai, que rechazó una key falsa con 401).
+- **Sin verificar en vivo:** el aviso de permiso de herramientas (la configuración local usa _auto mode_ y nunca pidió permiso; el mapeo está cubierto por pruebas) y todo en Mac.
+
 ### Fase 3 — Worktrees
 
 - "Nueva tarea" → crea rama + worktree y lanza el agente ahí.
@@ -170,7 +182,6 @@ Colaboración en equipo, RDP, app móvil, cloud, navegador embebido, plugins, Li
 
 ## Pendientes a validar
 
-- NVIDIA: cómo conectarlo (fase 2).
 - Firma de código: para Mac, sin cuenta de Apple Developer ($99/año) la app sale como "no verificada" y hay que abrirla con clic derecho → Abrir. En Windows sin certificado, SmartScreen avisa. Para uso interno se puede vivir con eso.
 - ¿Repo en GitHub de quién? (para CI y releases).
 - Probar la fase 1 en Mac (sólo se verificó en Windows; el CI corre las pruebas del daemon en ambos).

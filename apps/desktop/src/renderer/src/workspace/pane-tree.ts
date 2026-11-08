@@ -1,11 +1,11 @@
-import type { PaneNode, SplitDirection, TerminalPane } from '../../../shared/workspace'
+import type { PaneAgent, PaneNode, SplitDirection, TerminalPane } from '../../../shared/workspace'
 
 export function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID().slice(0, 8)}`
 }
 
-export function newTerminalPane(cwd: string): TerminalPane {
-  return { kind: 'terminal', id: newId('pane'), terminalId: null, cwd }
+export function newTerminalPane(cwd: string, agent?: PaneAgent): TerminalPane {
+  return { kind: 'terminal', id: newId('pane'), terminalId: null, cwd, ...(agent ? { agent } : {}) }
 }
 
 export function terminalPanes(node: PaneNode): TerminalPane[] {

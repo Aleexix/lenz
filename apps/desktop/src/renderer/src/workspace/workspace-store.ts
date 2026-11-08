@@ -1,5 +1,13 @@
 import { create } from 'zustand'
-import type { PaneNode, Project, SplitDirection, Tab, Workspace } from '../../../shared/workspace'
+import type {
+  PaneAgent,
+  PaneNode,
+  Project,
+  SplitDirection,
+  Tab,
+  TerminalPane,
+  Workspace,
+} from '../../../shared/workspace'
 import { EMPTY_WORKSPACE } from '../../../shared/workspace'
 import {
   findPane,
@@ -31,7 +39,11 @@ interface WorkspaceState {
   closePane(paneId: string, killTerminal?: boolean): void
   closeFocusedPane(): void
   focusPane(paneId: string): void
-  setTerminalId(paneId: string, terminalId: string): void
+  setTerminalId(paneId: string, terminalId: string, agent?: PaneAgent): void
+  /** Starts an agent in a new tab, or beside the focused pane. */
+  launchAgent(agent: PaneAgent, placement: 'tab' | 'split'): void
+  /** Shows the project and tab that hold `paneId` and focuses it. */
+  revealPane(paneId: string): void
   setSplitSizes(tabId: string, splitId: string, sizes: number[]): void
 }
 
@@ -57,6 +69,23 @@ function nextTabTitle(project: Project): string {
 function makeTab(project: Project): Tab {
   const pane = newTerminalPane(project.path)
   return { id: newId('tab'), title: nextTabTitle(project), root: pane, focusedPaneId: pane.id }
+}
+
+export interface AgentPaneRef {
+  project: Project
+  tab: Tab
+  pane: TerminalPane & { agent: PaneAgent }
+}
+
+/** Every agent pane in the workspace, in sidebar order. */
+export function agentPanes(workspace: Workspace): AgentPaneRef[] {
+  return workspace.projects.flatMap((project) =>
+    project.tabs.flatMap((tab) =>
+      terminalPanes(tab.root)
+        .filter((pane): pane is AgentPaneRef['pane'] => pane.agent !== undefined)
+        .map((pane) => ({ project, tab, pane })),
+    ),
+  )
 }
 
 export function activeProject(workspace: Workspace): Project | null {
@@ -212,13 +241,58 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       return { workspace: mapTabWithPane(workspace, paneId, (t) => ({ ...t, focusedPaneId: paneId })) }
     }),
 
-  setTerminalId: (paneId, terminalId) =>
+  setTerminalId: (paneId, terminalId, agent) =>
     set(({ workspace }) => ({
       workspace: mapTabWithPane(workspace, paneId, (tab) => ({
         ...tab,
-        root: updateTerminalPane(tab.root, paneId, { terminalId }),
+        root: updateTerminalPane(tab.root, paneId, agent ? { terminalId, agent } : { terminalId }),
       })),
     })),
+
+  launchAgent: (agent, placement) =>
+    set(({ workspace }) => {
+      const project = activeProject(workspace)
+      if (!project) return {}
+      const tab = activeTab(workspace)
+      const focused = tab ? findPane(tab.root, tab.focusedPaneId) : null
+      const pane = newTerminalPane(focused?.cwd || project.path, agent)
+      if (placement === 'split' && tab && focused) {
+        return {
+          workspace: mapTabWithPane(workspace, focused.id, (t) => ({
+            ...t,
+            root: splitPane(t.root, focused.id, 'horizontal', pane),
+            focusedPaneId: pane.id,
+          })),
+        }
+      }
+      const newTab: Tab = { id: newId('tab'), title: agent.name, root: pane, focusedPaneId: pane.id }
+      return {
+        workspace: mapProjects(workspace, (p) =>
+          p.id === project.id ? { ...p, tabs: [...p.tabs, newTab], activeTabId: newTab.id } : p,
+        ),
+      }
+    }),
+
+  revealPane: (paneId) =>
+    set(({ workspace }) => {
+      const project = workspace.projects.find((p) => p.tabs.some((t) => findPane(t.root, paneId)))
+      const tab = project?.tabs.find((t) => findPane(t.root, paneId))
+      if (!project || !tab) return {}
+      return {
+        workspace: {
+          ...mapProjects(workspace, (p) =>
+            p.id === project.id
+              ? {
+                  ...p,
+                  activeTabId: tab.id,
+                  tabs: p.tabs.map((t) => (t.id === tab.id ? { ...t, focusedPaneId: paneId } : t)),
+                }
+              : p,
+          ),
+          activeProjectId: project.id,
+        },
+      }
+    }),
 
   setSplitSizes: (tabId, splitId, sizes) =>
     set(({ workspace }) => ({

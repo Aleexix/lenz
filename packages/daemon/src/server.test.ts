@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { daemonEndpoint, type Events, LenzClient } from '@lenz/protocol'
+import { type AgentStatus, daemonEndpoint, type Events, hookUrl, LenzClient } from '@lenz/protocol'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LenzDaemon } from './server'
 
@@ -22,6 +22,22 @@ beforeAll(async () => {
 })
 
 afterAll(() => daemon.close())
+
+/**
+ * Kills a terminal and waits until it is gone. node-pty on Windows can crash
+ * the process if it exits while a PTY is still shutting down.
+ */
+async function killAndWait(client: LenzClient, id: string): Promise<void> {
+  const exited = new Promise<void>((resolve) =>
+    client.on('event', (name, payload) => {
+      if (name === 'terminal.exit' && (payload as Events['terminal.exit']).id === id) resolve()
+    }),
+  )
+  await client.request('terminal.kill', { id })
+  await exited
+  // Give ConPTY's teardown threads a moment before the next spawn or exit.
+  await new Promise((resolve) => setTimeout(resolve, 100))
+}
 
 function collect(client: LenzClient, id: string) {
   let text = ''
@@ -94,4 +110,99 @@ describe('lenzd', () => {
     })
     client.close()
   })
+
+  it('turns Claude Code hook calls into agent status', async () => {
+    const client = await LenzClient.connect(endpoint)
+    const { hookPort } = await client.request('daemon.hello', { client: 'test' })
+    const statuses: AgentStatus[] = []
+    client.on('event', (name, payload) => {
+      if (name === 'agent.status') statuses.push((payload as Events['agent.status']).status)
+    })
+
+    const token = 'tok_hooks_test_1234'
+    const info = await client.request('terminal.create', {
+      cwd: home,
+      cols: 80,
+      rows: 24,
+      argv: ECHO_PROGRAM,
+      agent: { name: 'Claude 1', profileId: 'claude' },
+      statusToken: token,
+    })
+    const post = (body: object) =>
+      fetch(hookUrl(hookPort, token), { method: 'POST', body: JSON.stringify(body) }).then((r) => r.status)
+
+    expect(await post({ hook_event_name: 'UserPromptSubmit', session_id: 'sess-1' })).toBe(200)
+    await waitFor(() => statuses.at(-1)?.state === 'working')
+
+    await post({
+      hook_event_name: 'PermissionRequest',
+      tool_name: 'Bash',
+      tool_input: { command: 'rm -rf x' },
+    })
+    await waitFor(() => statuses.at(-1)?.state === 'blocked')
+    expect(statuses.at(-1)).toMatchObject({
+      kind: 'permission',
+      message: 'Aprobar Bash: rm -rf x',
+      source: 'hook',
+    })
+
+    await post({ hook_event_name: 'Stop', last_assistant_message: 'Listo.\nDetalles…' })
+    await waitFor(() => statuses.at(-1)?.state === 'done')
+    expect(statuses.at(-1)?.message).toBe('Listo.')
+
+    const listed = (await client.request('terminal.list', {})).find((t) => t.id === info.id)
+    expect(listed?.agent).toEqual({ name: 'Claude 1', profileId: 'claude', sessionId: 'sess-1' })
+    expect(listed?.status?.state).toBe('done')
+
+    // Unknown tokens are ignored.
+    expect(await fetch(hookUrl(hookPort, 'tok_unknown_0000'), { method: 'POST', body: '{}' })).toHaveProperty(
+      'status',
+      200,
+    )
+    await killAndWait(client, info.id)
+    client.close()
+  }, 20_000)
+
+  const msg = Buffer.from('Compilando').toString('base64')
+  const REPORT = `process.stdout.write('\\x1b]7501;state=working:msg=${msg}\\x1b\\\\')`
+
+  async function firstStatus(program: string[]): Promise<AgentStatus> {
+    const client = await LenzClient.connect(endpoint)
+    let status: AgentStatus | undefined
+    client.on('event', (name, payload) => {
+      if (name === 'agent.status') status ??= (payload as Events['agent.status']).status
+    })
+    const info = await client.request('terminal.create', { cwd: home, cols: 80, rows: 24, argv: program })
+    try {
+      await waitFor(() => status !== undefined)
+    } finally {
+      await killAndWait(client, info.id)
+      client.close()
+    }
+    return status as AgentStatus
+  }
+
+  it('reads OSC 7501 status reports from program output', async () => {
+    const status = await firstStatus([process.execPath, '-e', `${REPORT};setTimeout(()=>{},5000)`])
+    expect(status).toMatchObject({ state: 'working', message: 'Compilando', source: 'osc' })
+  }, 20_000)
+
+  // ConPTY turns terminal input into key events and drops the OSC reply, so
+  // on Windows programs never hear back; hooks carry status there.
+  it.skipIf(process.platform === 'win32')(
+    'answers the OSC 7501 probe',
+    async () => {
+      const program = [
+        process.execPath,
+        '-e',
+        [
+          'process.stdin.setRawMode(true)',
+          "process.stdout.write('\\x1b]7501;?\\x1b\\\\')",
+          `process.stdin.on('data',d=>{if(String(d).includes('7501;?:states='))${REPORT}})`,
+        ].join(';'),
+      ]
+      expect(await firstStatus(program)).toMatchObject({ state: 'working', source: 'osc' })
+    },
+    20_000,
+  )
 })

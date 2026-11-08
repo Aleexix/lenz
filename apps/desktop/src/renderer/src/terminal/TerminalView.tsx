@@ -112,14 +112,33 @@ export function TerminalView({ pane, focused }: Props) {
       }
       if (disposed) return
       if (!replay) {
-        const info = await daemon.request('terminal.create', { cwd: paneRef.current.cwd, cols, rows })
+        const { cwd, agent } = paneRef.current
+        const info = agent
+          ? await window.lenz.agents.launch({
+              profileId: agent.profileId,
+              name: agent.name,
+              cwd,
+              cols,
+              rows,
+              // First start sends the task; later starts pick the conversation back up.
+              ...(agent.sessionId ? { resumeSessionId: agent.sessionId } : { prompt: agent.prompt }),
+            })
+          : await daemon.request('terminal.create', { cwd, cols, rows })
         if (disposed) {
           void daemon.request('terminal.kill', { id: info.id }).catch(() => undefined)
           return
         }
         id = info.id
         terminalId = id
-        setTerminalId(paneRef.current.id, id)
+        if (agent) {
+          const { prompt: _sent, ...rest } = agent
+          setTerminalId(paneRef.current.id, id, {
+            ...rest,
+            sessionId: info.agent?.sessionId ?? agent.sessionId,
+          })
+        } else {
+          setTerminalId(paneRef.current.id, id)
+        }
         replay = await daemon.request('terminal.attach', { id })
       }
       if (disposed) return

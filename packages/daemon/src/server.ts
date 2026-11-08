@@ -11,6 +11,8 @@ import {
   type RequestFrame,
   type Result,
 } from '@lenz/protocol'
+import type { HookPayload } from './claude-hooks'
+import { HookServer } from './hook-server'
 import { TerminalSession } from './terminal-session'
 
 const IDLE_EXIT_MS = 60_000
@@ -72,6 +74,11 @@ type Handler<M extends MethodName> = (client: ClientConnection, params: Params<M
 
 export class LenzDaemon {
   private readonly sessions = new Map<string, TerminalSession>()
+  /** statusToken → session, for hook calls. */
+  private readonly sessionsByToken = new Map<string, TerminalSession>()
+  private readonly hooks = new HookServer((token, payload) =>
+    this.sessionsByToken.get(token)?.applyHook(payload as HookPayload),
+  )
   private readonly clients = new Set<ClientConnection>()
   private readonly server: Server
   private readonly startedAt = Date.now()
@@ -92,7 +99,10 @@ export class LenzDaemon {
       unlinkSync(this.options.endpoint)
       await this.tryListen()
     }
-    this.options.log(`listening on ${this.options.endpoint} (build ${this.options.buildId})`)
+    await this.hooks.listen()
+    this.options.log(
+      `listening on ${this.options.endpoint}, hooks on port ${this.hooks.port} (build ${this.options.buildId})`,
+    )
     this.idleTimer = setInterval(() => this.checkIdle(), 5_000)
     this.idleTimer.unref()
   }
@@ -102,6 +112,7 @@ export class LenzDaemon {
     for (const session of this.sessions.values()) session.kill()
     for (const client of this.clients) client.socket.destroy()
     this.server.close()
+    this.hooks.close()
   }
 
   private tryListen(): Promise<void> {
@@ -168,6 +179,7 @@ export class LenzDaemon {
       pid: process.pid,
       startedAt: this.startedAt,
       terminals: this.sessions.size,
+      hookPort: this.hooks.port,
     }),
 
     'daemon.shutdown': () => {
@@ -188,8 +200,14 @@ export class LenzDaemon {
         throw new RpcError('spawn_failed', error instanceof Error ? error.message : String(error))
       }
       this.sessions.set(session.id, session)
+      const token = typeof params.statusToken === 'string' ? params.statusToken : undefined
+      if (token) this.sessionsByToken.set(token, session)
+      session.onStatus((status) => {
+        for (const client of this.clients) client.emit('agent.status', { id: session.id, status })
+      })
       session.onExit((exitCode) => {
         this.sessions.delete(session.id)
+        if (token) this.sessionsByToken.delete(token)
         this.idleSince = Date.now()
         for (const client of this.clients) {
           client.detach(session.id)

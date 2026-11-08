@@ -1,13 +1,17 @@
 import { randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import type { TerminalInfo } from '@lenz/protocol'
+import type { AgentMeta, AgentStatus, TerminalInfo } from '@lenz/protocol'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { Terminal as HeadlessTerminal } from '@xterm/headless'
 import * as pty from 'node-pty'
+import { type HookPayload, hookToStatus } from './claude-hooks'
 import { defaultShell } from './default-shell'
+import { PROGRAM_STATUS_QUERY_REPLY, parseProgramStatus } from './program-status'
 
 const SCROLLBACK_LINES = 5000
+/** Hooks speak for the agent; its own OSC 7501 reports fill in once hooks go quiet this long. */
+const HOOK_PRECEDENCE_MS = 120_000
 
 export interface SessionOptions {
   cwd: string
@@ -15,6 +19,8 @@ export interface SessionOptions {
   rows: number
   argv?: string[]
   env?: Record<string, string>
+  unsetEnv?: string[]
+  agent?: AgentMeta
 }
 
 interface Chunk {
@@ -24,6 +30,7 @@ interface Chunk {
 
 type DataListener = (chunk: Chunk) => void
 type ExitListener = (exitCode: number | null) => void
+type StatusListener = (status: AgentStatus) => void
 
 /**
  * One PTY plus a headless mirror of its screen, so a client that attaches
@@ -48,9 +55,13 @@ export class TerminalSession {
   private outbox = ''
   private flushScheduled = false
   private exited = false
+  private agent: AgentMeta | undefined
+  private status: AgentStatus | undefined
+  private lastHookAt = 0
 
   private readonly dataListeners = new Set<DataListener>()
   private readonly exitListeners = new Set<ExitListener>()
+  private readonly statusListeners = new Set<StatusListener>()
 
   constructor(options: SessionOptions) {
     const argv = options.argv?.length ? options.argv : defaultShell()
@@ -59,6 +70,9 @@ export class TerminalSession {
     this.cwd = existsSync(options.cwd) ? options.cwd : homedir()
     this.cols = clampSize(options.cols, 80)
     this.rows = clampSize(options.rows, 24)
+    this.agent = options.agent
+    // An agent waits for instructions until its first hook or report says otherwise.
+    if (options.agent) this.status = { state: 'idle', source: 'hook', updatedAt: this.createdAt }
 
     const env: Record<string, string> = {}
     for (const [key, value] of Object.entries(process.env)) {
@@ -67,6 +81,7 @@ export class TerminalSession {
     // lenzd runs as Electron-in-node-mode; children must not inherit that.
     delete env.ELECTRON_RUN_AS_NODE
     delete env.LENZ_BUILD_ID
+    for (const key of options.unsetEnv ?? []) delete env[key]
     Object.assign(env, options.env, {
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
@@ -81,6 +96,10 @@ export class TerminalSession {
       allowProposedApi: true,
     })
     this.mirror.loadAddon(this.serializer)
+    this.mirror.parser.registerOscHandler(7501, (body) => {
+      this.handleProgramStatus(body)
+      return true
+    })
 
     this.pty = pty.spawn(file, args, {
       name: 'xterm-256color',
@@ -102,6 +121,8 @@ export class TerminalSession {
       cols: this.cols,
       rows: this.rows,
       createdAt: this.createdAt,
+      ...(this.agent ? { agent: this.agent } : {}),
+      ...(this.status ? { status: this.status } : {}),
     }
   }
 
@@ -154,6 +175,63 @@ export class TerminalSession {
   onExit(listener: ExitListener): () => void {
     this.exitListeners.add(listener)
     return () => this.exitListeners.delete(listener)
+  }
+
+  onStatus(listener: StatusListener): () => void {
+    this.statusListeners.add(listener)
+    return () => this.statusListeners.delete(listener)
+  }
+
+  /** A Claude Code hook reported in (see HookServer). */
+  applyHook(payload: HookPayload): void {
+    this.lastHookAt = Date.now()
+    const update = hookToStatus(payload, this.status?.state)
+    if (!update) return
+    if (update.sessionId && this.agent && this.agent.sessionId !== update.sessionId) {
+      this.agent = { ...this.agent, sessionId: update.sessionId }
+    }
+    const { sessionId: _sessionId, ...status } = update
+    this.setStatus({ ...status, source: 'hook' })
+  }
+
+  private handleProgramStatus(body: string): void {
+    const message = parseProgramStatus(body)
+    if (!message) return
+    if (message.type === 'query') {
+      // The mirror parses in order, so the reply follows the question; only lenzd answers.
+      this.write(PROGRAM_STATUS_QUERY_REPLY)
+      return
+    }
+    if (Date.now() - this.lastHookAt < HOOK_PRECEDENCE_MS) return
+    const { state, kind, message: text } = message
+    this.setStatus({
+      state: state === 'clear' ? 'idle' : state,
+      ...(kind ? { kind } : {}),
+      ...(text ? { message: text } : {}),
+      source: 'osc',
+    })
+  }
+
+  private setStatus(next: Omit<AgentStatus, 'updatedAt'>): void {
+    const previous = this.status
+    if (
+      previous &&
+      previous.state === next.state &&
+      previous.kind === next.kind &&
+      previous.message === (next.message ?? previous.message)
+    ) {
+      return
+    }
+    // A tool-less update mid-turn keeps the last tool line.
+    const message = next.message ?? (next.state === previous?.state ? previous?.message : undefined)
+    const status: AgentStatus = {
+      ...next,
+      ...(message ? { message } : {}),
+      updatedAt: Date.now(),
+    }
+    if (!message) delete status.message
+    this.status = status
+    for (const listener of this.statusListeners) listener(status)
   }
 
   private handleExit(exitCode: number | null): void {

@@ -1,4 +1,11 @@
-export type ShortcutAction = 'newTab' | 'closePane' | 'splitRight' | 'splitDown' | 'nextTab' | 'prevTab'
+export type ShortcutAction =
+  | 'newTab'
+  | 'newAgent'
+  | 'closePane'
+  | 'splitRight'
+  | 'splitDown'
+  | 'nextTab'
+  | 'prevTab'
 
 const isMac = navigator.userAgent.includes('Mac')
 
@@ -15,6 +22,8 @@ export function matchShortcut(event: KeyboardEvent): ShortcutAction | null {
     switch (event.code) {
       case 'KeyT':
         return event.shiftKey ? null : 'newTab'
+      case 'KeyA':
+        return event.shiftKey ? 'newAgent' : null
       case 'KeyW':
         return event.shiftKey ? null : 'closePane'
       case 'KeyD':
@@ -32,6 +41,8 @@ export function matchShortcut(event: KeyboardEvent): ShortcutAction | null {
   switch (event.code) {
     case 'KeyT':
       return 'newTab'
+    case 'KeyA':
+      return 'newAgent'
     case 'KeyW':
       return 'closePane'
     case 'KeyD':
@@ -57,9 +68,18 @@ export function matchClipboard(event: KeyboardEvent, hasSelection: boolean): Cli
 }
 
 export const SHORTCUT_LABELS: Record<ShortcutAction, string> = isMac
-  ? { newTab: '⌘T', closePane: '⌘W', splitRight: '⌘D', splitDown: '⇧⌘D', nextTab: '⌃⇥', prevTab: '⌃⇧⇥' }
+  ? {
+      newTab: '⌘T',
+      newAgent: '⇧⌘A',
+      closePane: '⌘W',
+      splitRight: '⌘D',
+      splitDown: '⇧⌘D',
+      nextTab: '⌃⇥',
+      prevTab: '⌃⇧⇥',
+    }
   : {
       newTab: 'Ctrl+Shift+T',
+      newAgent: 'Ctrl+Shift+A',
       closePane: 'Ctrl+Shift+W',
       splitRight: 'Ctrl+Shift+D',
       splitDown: 'Ctrl+Shift+E',

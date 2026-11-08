@@ -1,5 +1,7 @@
-import { FolderGit2, Plus, Users, X } from 'lucide-react'
+import { FolderGit2, KeyRound, Plus, X } from 'lucide-react'
 import type { Project } from '../../../shared/workspace'
+import { SquadList } from '../agents/SquadList'
+import { useUi } from '../ui-store'
 import { useWorkspace } from './workspace-store'
 
 export async function pickAndOpenProject(): Promise<void> {
@@ -79,13 +81,18 @@ export function Sidebar() {
         )}
       </section>
 
-      <section className="px-3 pt-5">
-        <h2 className="mb-2 flex items-center gap-1.5 text-[11px] font-medium tracking-wider text-ice/50 uppercase">
-          <Users size={14} />
-          Squads
-        </h2>
-        <p className="px-1 text-sm text-ice/40">Ningún agente trabajando</p>
-      </section>
+      <SquadList />
+
+      <div className="border-t border-navy-800 p-2">
+        <button
+          type="button"
+          onClick={() => useUi.getState().openDialog('providers')}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-ice/60 hover:bg-navy-800/60 hover:text-ice"
+        >
+          <KeyRound size={14} />
+          Proveedores
+        </button>
+      </div>
     </aside>
   )
 }

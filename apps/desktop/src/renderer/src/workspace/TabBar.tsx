@@ -1,8 +1,31 @@
-import { Columns2, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
+import { Bot, Columns2, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { Project } from '../../../shared/workspace'
+import type { Project, Tab } from '../../../shared/workspace'
+import { type DisplayState, displayState, mostUrgent, useAgentStatus } from '../agents/agent-store'
+import { StateDot } from '../agents/StateDot'
+import { terminalPanes } from './pane-tree'
 import { SHORTCUT_LABELS } from './shortcuts'
 import { useWorkspace } from './workspace-store'
+
+function useTabAgentState(tab: Tab): DisplayState | null {
+  const statuses = useAgentStatus((state) => state.statuses)
+  const seen = useAgentStatus((state) => state.seen)
+  const agents = terminalPanes(tab.root).filter((pane) => pane.agent)
+  return mostUrgent(agents.map((pane) => displayState(pane.terminalId, statuses, seen)))
+}
+
+function TabIcon({ tab, active }: { tab: Tab; active: boolean }) {
+  const state = useTabAgentState(tab)
+  if (state) {
+    return (
+      <span className="relative flex shrink-0">
+        <Bot size={14} className={active ? 'text-electric-400' : ''} />
+        <StateDot state={state} className="absolute -right-0.5 -bottom-0.5 size-1.5 ring-2 ring-navy-950" />
+      </span>
+    )
+  }
+  return <SquareTerminal size={13} className={`shrink-0 ${active ? 'text-electric-400' : ''}`} />
+}
 
 export function TabBar({ project }: { project: Project }) {
   const { selectTab, closeTab, newTab, splitFocused } = useWorkspace.getState()
@@ -24,7 +47,7 @@ export function TabBar({ project }: { project: Project }) {
                 className="flex h-full min-w-0 flex-1 cursor-default items-center gap-2 pl-3 text-left"
                 onMouseDown={() => selectTab(tab.id)}
               >
-                <SquareTerminal size={13} className={`shrink-0 ${active ? 'text-electric-400' : ''}`} />
+                <TabIcon tab={tab} active={active} />
                 <span className="truncate">{tab.title}</span>
               </button>
               <button

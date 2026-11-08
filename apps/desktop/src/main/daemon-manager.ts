@@ -29,6 +29,8 @@ export class DaemonManager extends EventEmitter<ManagerEvents> {
   private readonly buildId: string
   private readonly endpoint: string
   status: DaemonStatus = 'disconnected'
+  /** lenzd's loopback port for agent hooks; changes when lenzd restarts. */
+  hookPort = 0
 
   constructor(
     private readonly home: string,
@@ -77,6 +79,7 @@ export class DaemonManager extends EventEmitter<ManagerEvents> {
         this.spawnDaemon()
         client = await this.waitForDaemon()
       }
+      this.hookPort = (await client.request('daemon.hello', { client: 'lenz-desktop' })).hookPort
       this.adopt(client)
       return client
     } catch (error) {

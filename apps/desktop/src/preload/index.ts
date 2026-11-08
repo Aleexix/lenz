@@ -1,6 +1,7 @@
-import type { EventName, Events, MethodName, Params, Result } from '@lenz/protocol'
+import type { EventName, Events, MethodName, Params, Result, TerminalInfo } from '@lenz/protocol'
 import { clipboard, contextBridge, ipcRenderer } from 'electron'
 import type { AppInfo, DaemonReply, DaemonStatus } from '../shared/app-info'
+import type { LaunchAgentRequest, ProfileInput, ProviderProfile } from '../shared/profiles'
 import type { Workspace } from '../shared/workspace'
 
 function on<A extends unknown[]>(channel: string, listener: (...args: A) => void): () => void {
@@ -9,8 +10,16 @@ function on<A extends unknown[]>(channel: string, listener: (...args: A) => void
   return () => ipcRenderer.off(channel, wrapped)
 }
 
+/** Unwraps a main-process reply; failures become plain Errors with a readable message. */
+async function call<T>(channel: string, ...args: unknown[]): Promise<T> {
+  const reply: DaemonReply<T> = await ipcRenderer.invoke(channel, ...args)
+  if (reply.ok) return reply.result
+  throw new Error(reply.message)
+}
+
 const lenz = {
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:info'),
+  focusWindow: (): void => ipcRenderer.send('app:focus-window'),
 
   daemon: {
     async request<M extends MethodName>(method: M, params: Params<M>): Promise<Result<M>> {
@@ -24,6 +33,16 @@ const lenz = {
     onEvent: (listener: <E extends EventName>(name: E, payload: Events[E]) => void) =>
       on('daemon:event', listener as (name: EventName, payload: Events[EventName]) => void),
     onReconnected: (listener: () => void) => on('daemon:reconnected', listener),
+  },
+
+  profiles: {
+    list: (): Promise<ProviderProfile[]> => call('profiles:list'),
+    save: (input: ProfileInput): Promise<ProviderProfile> => call('profiles:save', input),
+    delete: (id: string): Promise<void> => call('profiles:delete', id),
+  },
+
+  agents: {
+    launch: (request: LaunchAgentRequest): Promise<TerminalInfo> => call('agent:launch', request),
   },
 
   workspace: {

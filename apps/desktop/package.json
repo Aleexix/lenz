@@ -32,6 +32,7 @@
     "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "lucide-react": "^1.70.0",
+    "radix-ui": "^1.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-resizable-panels": "^4.19.1",

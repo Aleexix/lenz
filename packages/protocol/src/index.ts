@@ -1,3 +1,4 @@
+export * from './agent-hooks'
 export * from './client'
 export * from './endpoint'
 export * from './messages'
