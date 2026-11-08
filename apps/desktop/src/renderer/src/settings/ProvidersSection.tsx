@@ -1,9 +1,9 @@
 import { KeyRound, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { PROFILE_PRESETS, type ProfileInput, type ProviderProfile } from '../../../shared/profiles'
-import { Button, Dialog, Field, inputClass } from '../components/ui/dialog'
-import { useUi } from '../ui-store'
-import { useProfiles } from './profiles-store'
+import { useProfiles } from '../agents/profiles-store'
+import { Button, Field, inputClass } from '../components/ui/dialog'
+import { SectionHeader } from './SectionHeader'
 
 type Draft = ProfileInput & { help?: string }
 
@@ -19,20 +19,15 @@ function draftFrom(profile: ProviderProfile): Draft {
   }
 }
 
-export function ProvidersDialog() {
-  const open = useUi((state) => state.dialog === 'providers')
-  const openDialog = useUi((state) => state.openDialog)
+export function ProvidersSection() {
   const { profiles, refresh } = useProfiles()
   const [draft, setDraft] = useState<Draft | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (!open) return
     void refresh()
-    setDraft(null)
-    setError(null)
-  }, [open, refresh])
+  }, [refresh])
 
   const editing = draft?.id ? profiles.find((profile) => profile.id === draft.id) : undefined
 
@@ -68,14 +63,12 @@ export function ProvidersDialog() {
     setDraft((current) => (current ? { ...current, ...patch } : current))
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => openDialog(next ? 'providers' : null)}
-      title="Proveedores"
-      description="Con qué cuenta o API corre cada agente. Las API keys se guardan cifradas por el sistema operativo."
-      width="max-w-2xl"
-    >
-      <div className="grid grid-cols-[200px_1fr] gap-4">
+    <>
+      <SectionHeader
+        title="Proveedores"
+        description="Con qué cuenta o API corre cada agente. Las API keys se guardan cifradas por el sistema operativo."
+      />
+      <div className="grid grid-cols-[190px_1fr] gap-4">
         <div className="space-y-1">
           {profiles.map((profile) => (
             <button
@@ -216,6 +209,6 @@ export function ProvidersDialog() {
           )}
         </div>
       </div>
-    </Dialog>
+    </>
   )
 }

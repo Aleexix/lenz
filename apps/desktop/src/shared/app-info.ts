@@ -4,6 +4,8 @@ export interface AppInfo {
   version: string
   platform: Platform
   homeDir: string
+  /** Lenz's data folder: workspace, profiles, logs. */
+  dataDir: string
 }
 
 export type DaemonStatus = 'connecting' | 'connected' | 'disconnected'

@@ -36,7 +36,7 @@ El CI (GitHub Actions) genera el `.exe` y el `.dmg` en cada push a `main`; se de
 
 **Nuevo agente** (`+` en _Squad_, o Ctrl+Shift+A / ⇧⌘A) lanza Claude Code en el proyecto activo, con una tarea opcional. La barra lateral muestra a cada agente: **Trabajando**, **Te necesita** (pide permiso o tiene una pregunta), **Listo** (terminó y aún no lo miras), **Inactivo** o **Error**. Si un agente te necesita o termina mientras miras otra cosa, llega una notificación del sistema. Si reinicias el PC, al abrir Lenz cada agente retoma su conversación.
 
-**Proveedores** (abajo en la barra lateral):
+**Ajustes → Proveedores** (⚙ abajo en la barra lateral, o Ctrl+, / ⌘,):
 
 - _Claude (suscripción)_: usa tu sesión de `claude`. Requiere [Claude Code](https://claude.com/claude-code) instalado.
 - _z.ai (GLM)_: pega tu API key de z.ai.
@@ -54,6 +54,7 @@ Las API keys se guardan cifradas por el sistema operativo.
 | Dividir hacia abajo          | Ctrl+Shift+E                                  | ⇧⌘D      |
 | Cerrar panel                 | Ctrl+Shift+W                                  | ⌘W       |
 | Siguiente / anterior pestaña | Ctrl+Tab / Ctrl+Shift+Tab                     | ⌃⇥ / ⌃⇧⇥ |
+| Ajustes                      | Ctrl+,                                        | ⌘,       |
 | Copiar                       | Ctrl+C con texto seleccionado, o Ctrl+Shift+C | ⌘C       |
 | Pegar                        | Ctrl+V o Ctrl+Shift+V                         | ⌘V       |
 

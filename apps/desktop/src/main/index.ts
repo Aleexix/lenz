@@ -87,6 +87,7 @@ function registerIpc(): void {
       version: app.getVersion(),
       platform: process.platform as Platform,
       homeDir: homedir(),
+      dataDir: home,
     }),
   )
 

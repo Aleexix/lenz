@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 import type { AppInfo, DaemonStatus } from '../../shared/app-info'
 import { syncAgentStatus } from './agents/agent-store'
 import { NewAgentDialog } from './agents/NewAgentDialog'
-import { ProvidersDialog } from './agents/ProvidersDialog'
 import { useAgentAttention } from './agents/use-agent-attention'
 import lenzMark from './assets/lenz-mark-white.svg'
+import { SettingsDialog } from './settings/SettingsDialog'
 import { useUi } from './ui-store'
 import { PaneTree } from './workspace/PaneTree'
 import { pickAndOpenProject, Sidebar } from './workspace/Sidebar'
@@ -26,6 +26,7 @@ const SHORTCUT_HANDLERS: Record<ShortcutAction, () => void> = {
   splitDown: () => useWorkspace.getState().splitFocused('vertical'),
   nextTab: () => useWorkspace.getState().cycleTab(1),
   prevTab: () => useWorkspace.getState().cycleTab(-1),
+  openSettings: () => useUi.getState().openSettings(),
 }
 
 function usePersistedWorkspace(): void {
@@ -123,7 +124,7 @@ export function App() {
       </div>
 
       <NewAgentDialog />
-      <ProvidersDialog />
+      <SettingsDialog />
 
       <footer className="flex h-6 shrink-0 items-center justify-between border-t border-navy-800 px-3 font-mono text-[11px] text-ice/50">
         <DaemonIndicator status={daemonStatus} />

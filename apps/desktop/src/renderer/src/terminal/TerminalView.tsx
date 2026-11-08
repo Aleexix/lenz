@@ -5,6 +5,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import { useEffect, useRef } from 'react'
 import type { TerminalPane } from '../../../shared/workspace'
+import { useAgentStatus } from '../agents/agent-store'
 import { matchClipboard, matchShortcut } from '../workspace/shortcuts'
 import { useWorkspace } from '../workspace/workspace-store'
 import { LENZ_TERMINAL_THEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from './terminal-theme'
@@ -98,7 +99,7 @@ export function TerminalView({ pane, focused }: Props) {
       early.length = 0
       const { cols, rows } = term
       let id = paneRef.current.terminalId
-      let replay: { snapshot: string; seq: number } | null = null
+      let replay: Awaited<ReturnType<typeof daemon.request<'terminal.attach'>>> | null = null
 
       if (id) {
         terminalId = id
@@ -142,6 +143,8 @@ export function TerminalView({ pane, focused }: Props) {
         replay = await daemon.request('terminal.attach', { id })
       }
       if (disposed) return
+      // The squad list learns the agent's current state without waiting for its next change.
+      if (replay.info.status) useAgentStatus.getState().setStatus(replay.info.id, replay.info.status)
 
       term.reset()
       term.write(replay.snapshot)

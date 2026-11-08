@@ -6,6 +6,7 @@ export type ShortcutAction =
   | 'splitDown'
   | 'nextTab'
   | 'prevTab'
+  | 'openSettings'
 
 const isMac = navigator.userAgent.includes('Mac')
 
@@ -16,6 +17,10 @@ const isMac = navigator.userAgent.includes('Mac')
 export function matchShortcut(event: KeyboardEvent): ShortcutAction | null {
   if (event.type !== 'keydown') return null
   if (event.ctrlKey && event.code === 'Tab') return event.shiftKey ? 'prevTab' : 'nextTab'
+  // Ctrl+, / ⌘, opens settings, as in most desktop apps.
+  if (event.code === 'Comma' && !event.shiftKey && !event.altKey && (isMac ? event.metaKey : event.ctrlKey)) {
+    return 'openSettings'
+  }
 
   if (isMac) {
     if (!event.metaKey || event.ctrlKey || event.altKey) return null
@@ -76,6 +81,7 @@ export const SHORTCUT_LABELS: Record<ShortcutAction, string> = isMac
       splitDown: '⇧⌘D',
       nextTab: '⌃⇥',
       prevTab: '⌃⇧⇥',
+      openSettings: '⌘,',
     }
   : {
       newTab: 'Ctrl+Shift+T',
@@ -85,4 +91,5 @@ export const SHORTCUT_LABELS: Record<ShortcutAction, string> = isMac
       splitDown: 'Ctrl+Shift+E',
       nextTab: 'Ctrl+Tab',
       prevTab: 'Ctrl+Shift+Tab',
+      openSettings: 'Ctrl+,',
     }

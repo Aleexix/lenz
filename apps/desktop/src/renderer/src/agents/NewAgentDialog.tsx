@@ -15,6 +15,7 @@ function nextAgentName(): string {
 export function NewAgentDialog() {
   const open = useUi((state) => state.dialog === 'newAgent')
   const openDialog = useUi((state) => state.openDialog)
+  const openSettings = useUi((state) => state.openSettings)
   const { profiles, lastUsedId, refresh, setLastUsed } = useProfiles()
   const project = useWorkspace((state) => activeProject(state.workspace))
   const hasTab = useWorkspace((state) => activeTab(state.workspace) !== null)
@@ -85,13 +86,13 @@ export function NewAgentDialog() {
                 </option>
               ))}
             </select>
-            <Button variant="ghost" title="Gestionar proveedores" onClick={() => openDialog('providers')}>
+            <Button variant="ghost" title="Gestionar proveedores" onClick={() => openSettings('providers')}>
               <Settings2 size={16} />
             </Button>
           </div>
           {missingKey ? (
             <span className="block text-xs text-amber-300">
-              Este perfil no tiene API key. Agrégala en Proveedores.
+              Este perfil no tiene API key. Agrégala en Ajustes → Proveedores.
             </span>
           ) : null}
         </Field>

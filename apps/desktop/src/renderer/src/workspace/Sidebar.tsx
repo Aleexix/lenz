@@ -1,7 +1,8 @@
-import { FolderGit2, KeyRound, Plus, X } from 'lucide-react'
+import { FolderGit2, Plus, Settings, X } from 'lucide-react'
 import type { Project } from '../../../shared/workspace'
 import { SquadList } from '../agents/SquadList'
 import { useUi } from '../ui-store'
+import { SHORTCUT_LABELS } from './shortcuts'
 import { useWorkspace } from './workspace-store'
 
 export async function pickAndOpenProject(): Promise<void> {
@@ -86,11 +87,12 @@ export function Sidebar() {
       <div className="border-t border-navy-800 p-2">
         <button
           type="button"
-          onClick={() => useUi.getState().openDialog('providers')}
+          title={`Ajustes (${SHORTCUT_LABELS.openSettings})`}
+          onClick={() => useUi.getState().openSettings()}
           className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-ice/60 hover:bg-navy-800/60 hover:text-ice"
         >
-          <KeyRound size={14} />
-          Proveedores
+          <Settings size={14} />
+          Ajustes
         </button>
       </div>
     </aside>
