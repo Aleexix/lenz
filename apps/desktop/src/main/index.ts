@@ -4,11 +4,14 @@ import { join } from 'node:path'
 import { type Events, LenzRpcError, type MethodName } from '@lenz/protocol'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { AppInfo, DaemonReply, Platform } from '../shared/app-info'
+import type { CreateTaskRequest, RemoveTaskRequest } from '../shared/git'
 import type { LaunchAgentRequest, ProfileInput } from '../shared/profiles'
 import type { Workspace } from '../shared/workspace'
 import { AgentLauncher } from './agent-launcher'
 import { enableDevToolsShortcut, installAppMenu } from './app-menu'
+import { inheritClaudeTrust } from './claude-trust'
 import { DaemonManager } from './daemon-manager'
+import { createTaskWorktree, removeTaskWorktree, repoInfo, worktreeSummary } from './git-worktrees'
 import { ProfileStore } from './profile-store'
 import { WorkspaceStore } from './workspace-store'
 
@@ -63,6 +66,10 @@ async function launchAgent(request: LaunchAgentRequest) {
   if (!profile) throw new Error('Ese perfil ya no existe')
   const client = await daemon.getClient()
   const apiKey = profile.kind === 'claude-subscription' ? undefined : profiles.apiKey(profile.id)
+  if (request.trustFrom) {
+    const outcome = await inheritClaudeTrust(request.cwd, request.trustFrom).catch(() => 'unavailable')
+    log(`claude trust for ${request.cwd} from ${request.trustFrom}: ${outcome}`)
+  }
   const { params, settingsFile } = await launcher.prepare(request, profile, apiKey, daemon.hookPort)
   try {
     const info = await client.request('terminal.create', params)
@@ -80,6 +87,24 @@ function registerIpc(): void {
   ipcMain.handle('profiles:save', (_event, input: ProfileInput) => reply(() => profiles.save(input)))
   ipcMain.handle('profiles:delete', (_event, id: string) => reply(() => profiles.delete(id)))
   ipcMain.handle('agent:launch', (_event, request: LaunchAgentRequest) => reply(() => launchAgent(request)))
+
+  ipcMain.handle('git:repo-info', (_event, path: string) => reply(() => repoInfo(path)))
+  ipcMain.handle('git:create-task', (_event, request: CreateTaskRequest) =>
+    reply(async () => {
+      const created = await createTaskWorktree(request)
+      log(`task worktree ${created.branch} at ${created.path}`)
+      return created
+    }),
+  )
+  ipcMain.handle('git:summary', (_event, path: string, baseBranch: string) =>
+    reply(() => worktreeSummary(path, baseBranch)),
+  )
+  ipcMain.handle('git:remove-task', (_event, request: RemoveTaskRequest) =>
+    reply(async () => {
+      await removeTaskWorktree(request)
+      log(`task worktree removed: ${request.path} (branch ${request.deleteBranch ? 'deleted' : 'kept'})`)
+    }),
+  )
 
   ipcMain.handle(
     'app:info',
@@ -126,6 +151,20 @@ function registerIpc(): void {
     const options = { title: 'Abrir proyecto', properties: ['openDirectory' as const] }
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
     return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
+
+  ipcMain.handle('dialog:choose', async (event, message: string, detail: string, buttons: string[]) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const options = {
+      type: 'question' as const,
+      message,
+      detail,
+      buttons: [...buttons, 'Cancelar'],
+      defaultId: buttons.length,
+      cancelId: buttons.length,
+    }
+    const result = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options)
+    return result.response === buttons.length ? -1 : result.response
   })
 
   ipcMain.handle('dialog:confirm', async (event, message: string, detail: string, confirmLabel: string) => {

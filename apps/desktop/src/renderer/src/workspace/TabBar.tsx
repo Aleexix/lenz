@@ -1,6 +1,6 @@
 import { Bot, Columns2, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { Project, Tab } from '../../../shared/workspace'
+import type { Space, Tab } from '../../../shared/workspace'
 import { type DisplayState, displayState, mostUrgent, useAgentStatus } from '../agents/agent-store'
 import { StateDot } from '../agents/StateDot'
 import { terminalPanes } from './pane-tree'
@@ -27,14 +27,14 @@ function TabIcon({ tab, active }: { tab: Tab; active: boolean }) {
   return <SquareTerminal size={13} className={`shrink-0 ${active ? 'text-electric-400' : ''}`} />
 }
 
-export function TabBar({ project }: { project: Project }) {
+export function TabBar({ space }: { space: Space }) {
   const { selectTab, closeTab, newTab, splitFocused } = useWorkspace.getState()
 
   return (
     <div className="flex h-9 shrink-0 items-stretch border-b border-navy-800 bg-navy-950">
       <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">
-        {project.tabs.map((tab) => {
-          const active = tab.id === project.activeTabId
+        {space.tabs.map((tab) => {
+          const active = tab.id === space.activeTabId
           return (
             <div
               key={tab.id}

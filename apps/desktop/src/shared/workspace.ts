@@ -45,7 +45,45 @@ export interface Tab {
   focusedPaneId: string
 }
 
+/**
+ * A folder with its own tabs. Every project has a `main` space (the folder
+ * itself); each task adds one in its own git worktree and branch.
+ */
+export interface Space {
+  id: string
+  kind: 'main' | 'task'
+  name: string
+  path: string
+  tabs: Tab[]
+  activeTabId: string | null
+  /** Task spaces: the branch the worktree is on, and the one it started from. */
+  branch?: string
+  baseBranch?: string
+  createdAt?: number
+}
+
 export interface Project {
+  id: string
+  name: string
+  /** The project's own folder (for git projects, the main checkout). */
+  path: string
+  spaces: Space[]
+  activeSpaceId: string
+}
+
+export interface Workspace {
+  version: 2
+  projects: Project[]
+  activeProjectId: string | null
+}
+
+export const EMPTY_WORKSPACE: Workspace = { version: 2, projects: [], activeProjectId: null }
+
+export function mainSpaceId(projectId: string): string {
+  return `main_${projectId}`
+}
+
+interface ProjectV1 {
   id: string
   name: string
   path: string
@@ -53,10 +91,30 @@ export interface Project {
   activeTabId: string | null
 }
 
-export interface Workspace {
-  version: 1
-  projects: Project[]
-  activeProjectId: string | null
+/** Reads any saved workspace version; null when the data is not a workspace. */
+export function migrateWorkspace(data: unknown): Workspace | null {
+  const raw = data as { version?: number; projects?: unknown; activeProjectId?: string | null } | null
+  if (!raw || !Array.isArray(raw.projects)) return null
+  if (raw.version === 2) return raw as Workspace
+  if (raw.version !== 1) return null
+  // v1: tabs lived on the project; they become its main space.
+  const projects = (raw.projects as ProjectV1[]).map(
+    (project): Project => ({
+      id: project.id,
+      name: project.name,
+      path: project.path,
+      activeSpaceId: mainSpaceId(project.id),
+      spaces: [
+        {
+          id: mainSpaceId(project.id),
+          kind: 'main',
+          name: project.name,
+          path: project.path,
+          tabs: project.tabs ?? [],
+          activeTabId: project.activeTabId ?? null,
+        },
+      ],
+    }),
+  )
+  return { version: 2, projects, activeProjectId: raw.activeProjectId ?? null }
 }
-
-export const EMPTY_WORKSPACE: Workspace = { version: 1, projects: [], activeProjectId: null }

@@ -32,6 +32,10 @@ El CI (GitHub Actions) genera el `.exe` y el `.dmg` en cada push a `main`; se de
 > **Mac:** la app no está firmada. La primera vez ábrela con clic derecho → Abrir.
 > **Windows:** SmartScreen avisa porque no hay certificado; "Más información" → "Ejecutar de todas formas".
 
+## Tareas
+
+En un proyecto git, **Nueva tarea** (icono de rama al pasar el mouse sobre el proyecto, o Ctrl+Shift+N / ⇧⌘N) crea una rama `lenz/<nombre>` y su propia carpeta (_worktree_) en `<repo>-worktrees/<nombre>`, y puede lanzar un agente ahí con una tarea. Así varios agentes trabajan en paralelo sin pisarse. La barra lateral muestra cada tarea bajo su proyecto con sus archivos sin commit (`●3`) y sus commits nuevos (`↑2`). Al borrar una tarea eliges si conservar su rama.
+
 ## Agentes
 
 **Nuevo agente** (`+` en _Squad_, o Ctrl+Shift+A / ⇧⌘A) lanza Claude Code en el proyecto activo, con una tarea opcional. La barra lateral muestra a cada agente: **Trabajando**, **Te necesita** (pide permiso o tiene una pregunta), **Listo** (terminó y aún no lo miras), **Inactivo** o **Error**. Si un agente te necesita o termina mientras miras otra cosa, llega una notificación del sistema. Si reinicias el PC, al abrir Lenz cada agente retoma su conversación.
@@ -50,6 +54,7 @@ Las API keys se guardan cifradas por el sistema operativo.
 | ---------------------------- | --------------------------------------------- | -------- |
 | Nueva pestaña                | Ctrl+Shift+T                                  | ⌘T       |
 | Nuevo agente                 | Ctrl+Shift+A                                  | ⇧⌘A      |
+| Nueva tarea                  | Ctrl+Shift+N                                  | ⇧⌘N      |
 | Dividir a la derecha         | Ctrl+Shift+D                                  | ⌘D       |
 | Dividir hacia abajo          | Ctrl+Shift+E                                  | ⇧⌘D      |
 | Cerrar panel                 | Ctrl+Shift+W                                  | ⌘W       |

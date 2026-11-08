@@ -1,6 +1,13 @@
 import type { EventName, Events, MethodName, Params, Result, TerminalInfo } from '@lenz/protocol'
 import { clipboard, contextBridge, ipcRenderer } from 'electron'
 import type { AppInfo, DaemonReply, DaemonStatus } from '../shared/app-info'
+import type {
+  CreatedWorktree,
+  CreateTaskRequest,
+  RemoveTaskRequest,
+  RepoInfo,
+  WorktreeSummary,
+} from '../shared/git'
 import type { LaunchAgentRequest, ProfileInput, ProviderProfile } from '../shared/profiles'
 import type { Workspace } from '../shared/workspace'
 
@@ -45,6 +52,14 @@ const lenz = {
     launch: (request: LaunchAgentRequest): Promise<TerminalInfo> => call('agent:launch', request),
   },
 
+  git: {
+    repoInfo: (path: string): Promise<RepoInfo | null> => call('git:repo-info', path),
+    createTask: (request: CreateTaskRequest): Promise<CreatedWorktree> => call('git:create-task', request),
+    summary: (path: string, baseBranch: string): Promise<WorktreeSummary> =>
+      call('git:summary', path, baseBranch),
+    removeTask: (request: RemoveTaskRequest): Promise<void> => call('git:remove-task', request),
+  },
+
   workspace: {
     load: (): Promise<Workspace | null> => ipcRenderer.invoke('workspace:load'),
     save: (workspace: Workspace): Promise<void> => ipcRenderer.invoke('workspace:save', workspace),
@@ -56,6 +71,9 @@ const lenz = {
 
   dialog: {
     openFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:open-folder'),
+    /** Index of the chosen button, or -1 when cancelled. A "Cancelar" button is added. */
+    choose: (message: string, detail: string, buttons: string[]): Promise<number> =>
+      ipcRenderer.invoke('dialog:choose', message, detail, buttons),
     confirm: (message: string, detail: string, confirmLabel: string): Promise<boolean> =>
       ipcRenderer.invoke('dialog:confirm', message, detail, confirmLabel),
   },

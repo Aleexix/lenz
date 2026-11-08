@@ -3,12 +3,13 @@ import type {
   PaneAgent,
   PaneNode,
   Project,
+  Space,
   SplitDirection,
   Tab,
   TerminalPane,
   Workspace,
 } from '../../../shared/workspace'
-import { EMPTY_WORKSPACE } from '../../../shared/workspace'
+import { EMPTY_WORKSPACE, mainSpaceId } from '../../../shared/workspace'
 import {
   findPane,
   newId,
@@ -20,6 +21,15 @@ import {
   updateTerminalPane,
 } from './pane-tree'
 
+export interface NewTaskSpace {
+  name: string
+  path: string
+  branch: string
+  baseBranch: string
+  /** Runs in the task's first tab; a plain shell when absent. */
+  agent?: PaneAgent
+}
+
 interface WorkspaceState {
   workspace: Workspace
   loaded: boolean
@@ -28,6 +38,11 @@ interface WorkspaceState {
   openProject(path: string): void
   removeProject(projectId: string): void
   selectProject(projectId: string): void
+  selectSpace(spaceId: string): void
+  /** Adds a task space (its worktree already exists) and shows it. */
+  addTaskSpace(projectId: string, task: NewTaskSpace): void
+  /** Closes a task space and its terminals; the worktree is removed by the caller. */
+  removeSpace(spaceId: string): void
 
   newTab(): void
   closeTab(tabId: string): void
@@ -40,9 +55,9 @@ interface WorkspaceState {
   closeFocusedPane(): void
   focusPane(paneId: string): void
   setTerminalId(paneId: string, terminalId: string, agent?: PaneAgent): void
-  /** Starts an agent in a new tab, or beside the focused pane. */
+  /** Starts an agent in a new tab, or beside the focused pane, in the active space. */
   launchAgent(agent: PaneAgent, placement: 'tab' | 'split'): void
-  /** Shows the project and tab that hold `paneId` and focuses it. */
+  /** Shows the project, space and tab that hold `paneId` and focuses it. */
   revealPane(paneId: string): void
   setSplitSizes(tabId: string, splitId: string, sizes: number[]): void
 }
@@ -55,24 +70,56 @@ function killTerminals(root: PaneNode): void {
   }
 }
 
+function killSpace(space: Space): void {
+  for (const tab of space.tabs) killTerminals(tab.root)
+}
+
 function folderName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path
 }
 
-function nextTabTitle(project: Project): string {
-  const used = new Set(project.tabs.map((tab) => tab.title))
-  let number = project.tabs.length + 1
+function nextTabTitle(space: Space): string {
+  const used = new Set(space.tabs.map((tab) => tab.title))
+  let number = space.tabs.length + 1
   while (used.has(`Terminal ${number}`)) number++
   return `Terminal ${number}`
 }
 
-function makeTab(project: Project): Tab {
-  const pane = newTerminalPane(project.path)
-  return { id: newId('tab'), title: nextTabTitle(project), root: pane, focusedPaneId: pane.id }
+function makeTab(space: Space, agent?: PaneAgent): Tab {
+  const pane = newTerminalPane(space.path, agent)
+  return { id: newId('tab'), title: agent?.name ?? nextTabTitle(space), root: pane, focusedPaneId: pane.id }
 }
 
-export interface AgentPaneRef {
+// ── Lookups ────────────────────────────────────────────────────────────────
+
+export function activeProject(workspace: Workspace): Project | null {
+  return workspace.projects.find((project) => project.id === workspace.activeProjectId) ?? null
+}
+
+export function activeSpace(workspace: Workspace): Space | null {
+  const project = activeProject(workspace)
+  return project?.spaces.find((space) => space.id === project.activeSpaceId) ?? project?.spaces[0] ?? null
+}
+
+export function activeTab(workspace: Workspace): Tab | null {
+  const space = activeSpace(workspace)
+  return space?.tabs.find((tab) => tab.id === space.activeTabId) ?? null
+}
+
+export interface SpaceRef {
   project: Project
+  space: Space
+}
+
+export function findSpace(workspace: Workspace, spaceId: string): SpaceRef | null {
+  for (const project of workspace.projects) {
+    const space = project.spaces.find((candidate) => candidate.id === spaceId)
+    if (space) return { project, space }
+  }
+  return null
+}
+
+export interface AgentPaneRef extends SpaceRef {
   tab: Tab
   pane: TerminalPane & { agent: PaneAgent }
 }
@@ -80,49 +127,59 @@ export interface AgentPaneRef {
 /** Every agent pane in the workspace, in sidebar order. */
 export function agentPanes(workspace: Workspace): AgentPaneRef[] {
   return workspace.projects.flatMap((project) =>
-    project.tabs.flatMap((tab) =>
-      terminalPanes(tab.root)
-        .filter((pane): pane is AgentPaneRef['pane'] => pane.agent !== undefined)
-        .map((pane) => ({ project, tab, pane })),
+    project.spaces.flatMap((space) =>
+      space.tabs.flatMap((tab) =>
+        terminalPanes(tab.root)
+          .filter((pane): pane is AgentPaneRef['pane'] => pane.agent !== undefined)
+          .map((pane) => ({ project, space, tab, pane })),
+      ),
     ),
   )
 }
 
-export function activeProject(workspace: Workspace): Project | null {
-  return workspace.projects.find((project) => project.id === workspace.activeProjectId) ?? null
-}
-
-export function activeTab(workspace: Workspace): Tab | null {
-  const project = activeProject(workspace)
-  return project?.tabs.find((tab) => tab.id === project.activeTabId) ?? null
-}
-
-/** Applies `change` to the project and tab that hold `paneId`. */
-function mapTabWithPane(
-  workspace: Workspace,
-  paneId: string,
-  change: (tab: Tab, project: Project) => Tab | null,
-) {
-  return mapProjects(workspace, (project) => {
-    const tab = project.tabs.find((candidate) => findPane(candidate.root, paneId))
-    if (!tab) return project
-    const updated = change(tab, project)
-    if (updated) return { ...project, tabs: project.tabs.map((t) => (t.id === tab.id ? updated : t)) }
-    return withoutTab(project, tab.id)
-  })
-}
+// ── Immutable updates ──────────────────────────────────────────────────────
 
 function mapProjects(workspace: Workspace, change: (project: Project) => Project): Workspace {
   return { ...workspace, projects: workspace.projects.map(change) }
 }
 
-function withoutTab(project: Project, tabId: string): Project {
-  const index = project.tabs.findIndex((tab) => tab.id === tabId)
-  const tabs = project.tabs.filter((tab) => tab.id !== tabId)
-  const activeTabId =
-    project.activeTabId === tabId ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? null) : project.activeTabId
-  return { ...project, tabs, activeTabId }
+function mapSpaces(workspace: Workspace, change: (space: Space, project: Project) => Space): Workspace {
+  return mapProjects(workspace, (project) => ({
+    ...project,
+    spaces: project.spaces.map((space) => change(space, project)),
+  }))
 }
+
+/** Applies `change` to the tab that holds `paneId`; null removes the tab. */
+function mapTabWithPane(workspace: Workspace, paneId: string, change: (tab: Tab) => Tab | null): Workspace {
+  return mapSpaces(workspace, (space) => {
+    const tab = space.tabs.find((candidate) => findPane(candidate.root, paneId))
+    if (!tab) return space
+    const updated = change(tab)
+    if (updated) return { ...space, tabs: space.tabs.map((t) => (t.id === tab.id ? updated : t)) }
+    return withoutTab(space, tab.id)
+  })
+}
+
+function mapActiveSpace(workspace: Workspace, change: (space: Space) => Space): Workspace {
+  const target = activeSpace(workspace)
+  if (!target) return workspace
+  return mapSpaces(workspace, (space) => (space.id === target.id ? change(space) : space))
+}
+
+function withoutTab(space: Space, tabId: string): Space {
+  const index = space.tabs.findIndex((tab) => tab.id === tabId)
+  const tabs = space.tabs.filter((tab) => tab.id !== tabId)
+  const activeTabId =
+    space.activeTabId === tabId ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? null) : space.activeTabId
+  return { ...space, tabs, activeTabId }
+}
+
+function withTab(space: Space, tab: Tab): Space {
+  return { ...space, tabs: [...space.tabs, tab], activeTabId: tab.id }
+}
+
+// ── Store ──────────────────────────────────────────────────────────────────
 
 export const useWorkspace = create<WorkspaceState>()((set, get) => ({
   workspace: EMPTY_WORKSPACE,
@@ -134,17 +191,24 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     set(({ workspace }) => {
       const existing = workspace.projects.find((project) => project.path === path)
       if (existing) return { workspace: { ...workspace, activeProjectId: existing.id } }
-      const project: Project = {
-        id: newId('proj'),
+      const id = newId('proj')
+      const main: Space = {
+        id: mainSpaceId(id),
+        kind: 'main',
         name: folderName(path),
         path,
         tabs: [],
         activeTabId: null,
       }
-      const tab = makeTab(project)
-      const opened = { ...project, tabs: [tab], activeTabId: tab.id }
+      const project: Project = {
+        id,
+        name: folderName(path),
+        path,
+        spaces: [withTab(main, makeTab(main))],
+        activeSpaceId: main.id,
+      }
       return {
-        workspace: { ...workspace, projects: [...workspace.projects, opened], activeProjectId: opened.id },
+        workspace: { ...workspace, projects: [...workspace.projects, project], activeProjectId: id },
       }
     }),
 
@@ -152,7 +216,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     set(({ workspace }) => {
       const project = workspace.projects.find((candidate) => candidate.id === projectId)
       if (!project) return {}
-      for (const tab of project.tabs) killTerminals(tab.root)
+      for (const space of project.spaces) killSpace(space)
       const projects = workspace.projects.filter((candidate) => candidate.id !== projectId)
       const activeProjectId =
         workspace.activeProjectId === projectId ? (projects[0]?.id ?? null) : workspace.activeProjectId
@@ -162,51 +226,96 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
   selectProject: (projectId) =>
     set(({ workspace }) => ({ workspace: { ...workspace, activeProjectId: projectId } })),
 
-  newTab: () =>
+  selectSpace: (spaceId) =>
     set(({ workspace }) => {
-      const project = activeProject(workspace)
-      if (!project) return {}
-      const tab = makeTab(project)
+      const ref = findSpace(workspace, spaceId)
+      if (!ref) return {}
       return {
-        workspace: mapProjects(workspace, (p) =>
-          p.id === project.id ? { ...p, tabs: [...p.tabs, tab], activeTabId: tab.id } : p,
-        ),
+        workspace: {
+          ...mapProjects(workspace, (p) => (p.id === ref.project.id ? { ...p, activeSpaceId: spaceId } : p)),
+          activeProjectId: ref.project.id,
+        },
       }
     }),
 
+  addTaskSpace: (projectId, task) =>
+    set(({ workspace }) => {
+      const blank: Space = {
+        id: newId('task'),
+        kind: 'task',
+        name: task.name,
+        path: task.path,
+        branch: task.branch,
+        baseBranch: task.baseBranch,
+        createdAt: Date.now(),
+        tabs: [],
+        activeTabId: null,
+      }
+      const space = withTab(blank, makeTab(blank, task.agent))
+      return {
+        workspace: {
+          ...mapProjects(workspace, (p) =>
+            p.id === projectId ? { ...p, spaces: [...p.spaces, space], activeSpaceId: space.id } : p,
+          ),
+          activeProjectId: projectId,
+        },
+      }
+    }),
+
+  removeSpace: (spaceId) =>
+    set(({ workspace }) => {
+      const ref = findSpace(workspace, spaceId)
+      if (!ref || ref.space.kind === 'main') return {}
+      killSpace(ref.space)
+      return {
+        workspace: mapProjects(workspace, (p) => {
+          if (p.id !== ref.project.id) return p
+          const spaces = p.spaces.filter((space) => space.id !== spaceId)
+          return {
+            ...p,
+            spaces,
+            activeSpaceId: p.activeSpaceId === spaceId ? mainSpaceId(p.id) : p.activeSpaceId,
+          }
+        }),
+      }
+    }),
+
+  newTab: () =>
+    set(({ workspace }) => ({ workspace: mapActiveSpace(workspace, (s) => withTab(s, makeTab(s))) })),
+
   closeTab: (tabId) =>
     set(({ workspace }) => ({
-      workspace: mapProjects(workspace, (project) => {
-        const tab = project.tabs.find((candidate) => candidate.id === tabId)
-        if (!tab) return project
+      workspace: mapSpaces(workspace, (space) => {
+        const tab = space.tabs.find((candidate) => candidate.id === tabId)
+        if (!tab) return space
         killTerminals(tab.root)
-        return withoutTab(project, tabId)
+        return withoutTab(space, tabId)
       }),
     })),
 
   selectTab: (tabId) =>
     set(({ workspace }) => ({
-      workspace: mapProjects(workspace, (project) =>
-        project.tabs.some((tab) => tab.id === tabId) ? { ...project, activeTabId: tabId } : project,
+      workspace: mapSpaces(workspace, (space) =>
+        space.tabs.some((tab) => tab.id === tabId) ? { ...space, activeTabId: tabId } : space,
       ),
     })),
 
   cycleTab: (step) => {
-    const project = activeProject(get().workspace)
-    if (!project || project.tabs.length < 2) return
-    const index = project.tabs.findIndex((tab) => tab.id === project.activeTabId)
-    const next = project.tabs[(index + step + project.tabs.length) % project.tabs.length]
+    const space = activeSpace(get().workspace)
+    if (!space || space.tabs.length < 2) return
+    const index = space.tabs.findIndex((tab) => tab.id === space.activeTabId)
+    const next = space.tabs[(index + step + space.tabs.length) % space.tabs.length]
     if (next) get().selectTab(next.id)
   },
 
   splitFocused: (direction) =>
     set(({ workspace }) => {
       const tab = activeTab(workspace)
-      const project = activeProject(workspace)
-      if (!tab || !project) return {}
+      const space = activeSpace(workspace)
+      if (!tab || !space) return {}
       const focused = findPane(tab.root, tab.focusedPaneId) ?? terminalPanes(tab.root)[0]
       if (!focused) return {}
-      const added = newTerminalPane(focused.cwd || project.path)
+      const added = newTerminalPane(focused.cwd || space.path)
       return {
         workspace: mapTabWithPane(workspace, focused.id, (t) => ({
           ...t,
@@ -251,12 +360,12 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
 
   launchAgent: (agent, placement) =>
     set(({ workspace }) => {
-      const project = activeProject(workspace)
-      if (!project) return {}
+      const space = activeSpace(workspace)
+      if (!space) return {}
       const tab = activeTab(workspace)
       const focused = tab ? findPane(tab.root, tab.focusedPaneId) : null
-      const pane = newTerminalPane(focused?.cwd || project.path, agent)
       if (placement === 'split' && tab && focused) {
+        const pane = newTerminalPane(focused.cwd || space.path, agent)
         return {
           workspace: mapTabWithPane(workspace, focused.id, (t) => ({
             ...t,
@@ -265,29 +374,39 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
           })),
         }
       }
-      const newTab: Tab = { id: newId('tab'), title: agent.name, root: pane, focusedPaneId: pane.id }
-      return {
-        workspace: mapProjects(workspace, (p) =>
-          p.id === project.id ? { ...p, tabs: [...p.tabs, newTab], activeTabId: newTab.id } : p,
-        ),
-      }
+      return { workspace: mapActiveSpace(workspace, (s) => withTab(s, makeTab(s, agent))) }
     }),
 
   revealPane: (paneId) =>
     set(({ workspace }) => {
-      const project = workspace.projects.find((p) => p.tabs.some((t) => findPane(t.root, paneId)))
-      const tab = project?.tabs.find((t) => findPane(t.root, paneId))
-      if (!project || !tab) return {}
+      const ref = agentPanes(workspace).find(({ pane }) => pane.id === paneId)
+      const target =
+        ref ??
+        workspace.projects
+          .flatMap((project) =>
+            project.spaces.flatMap((space) => space.tabs.map((tab) => ({ project, space, tab }))),
+          )
+          .find(({ tab }) => findPane(tab.root, paneId))
+      if (!target) return {}
+      const { project, space, tab } = target
       return {
         workspace: {
           ...mapProjects(workspace, (p) =>
-            p.id === project.id
-              ? {
+            p.id !== project.id
+              ? p
+              : {
                   ...p,
-                  activeTabId: tab.id,
-                  tabs: p.tabs.map((t) => (t.id === tab.id ? { ...t, focusedPaneId: paneId } : t)),
-                }
-              : p,
+                  activeSpaceId: space.id,
+                  spaces: p.spaces.map((s) =>
+                    s.id !== space.id
+                      ? s
+                      : {
+                          ...s,
+                          activeTabId: tab.id,
+                          tabs: s.tabs.map((t) => (t.id === tab.id ? { ...t, focusedPaneId: paneId } : t)),
+                        },
+                  ),
+                },
           ),
           activeProjectId: project.id,
         },
@@ -296,9 +415,9 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
 
   setSplitSizes: (tabId, splitId, sizes) =>
     set(({ workspace }) => ({
-      workspace: mapProjects(workspace, (project) => ({
-        ...project,
-        tabs: project.tabs.map((tab) =>
+      workspace: mapSpaces(workspace, (space) => ({
+        ...space,
+        tabs: space.tabs.map((tab) =>
           tab.id === tabId ? { ...tab, root: setSplitSizes(tab.root, splitId, sizes) } : tab,
         ),
       })),

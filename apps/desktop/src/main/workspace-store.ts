@@ -1,15 +1,14 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import type { Workspace } from '../shared/workspace'
+import { migrateWorkspace, type Workspace } from '../shared/workspace'
 
-/** workspace.json in the user data folder; written atomically. */
+/** workspace.json in the user data folder; written atomically, older versions migrated on read. */
 export class WorkspaceStore {
   constructor(private readonly file: string) {}
 
   load(): Workspace | null {
     try {
-      const data = JSON.parse(readFileSync(this.file, 'utf8')) as Workspace
-      return data?.version === 1 && Array.isArray(data.projects) ? data : null
+      return migrateWorkspace(JSON.parse(readFileSync(this.file, 'utf8')))
     } catch {
       return null
     }

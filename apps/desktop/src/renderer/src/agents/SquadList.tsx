@@ -35,13 +35,15 @@ export function SquadList() {
         <p className="px-1 text-sm text-ice/40">Ningún agente trabajando</p>
       ) : (
         <ul className="min-h-0 space-y-px overflow-y-auto pb-2">
-          {agents.map(({ project, pane }) => {
+          {agents.map(({ project, space, pane }) => {
             const state = displayState(pane.terminalId, statuses, seen)
             const status = pane.terminalId ? statuses[pane.terminalId] : undefined
             const detail = status?.message ? `${STATE_LABEL[state]} · ${status.message}` : STATE_LABEL[state]
             const focused =
               workspace.activeProjectId === project.id &&
-              project.tabs.some((tab) => tab.id === project.activeTabId && tab.focusedPaneId === pane.id)
+              project.activeSpaceId === space.id &&
+              space.tabs.some((tab) => tab.id === space.activeTabId && tab.focusedPaneId === pane.id)
+            const where = space.kind === 'task' ? `${project.name} · ${space.name}` : project.name
             return (
               <li key={pane.id}>
                 <button
@@ -60,7 +62,7 @@ export function SquadList() {
                       >
                         {pane.agent.name}
                       </span>
-                      <span className="truncate text-[11px] text-ice/35">{project.name}</span>
+                      <span className="truncate text-[11px] text-ice/35">{where}</span>
                     </span>
                     <span className="block truncate text-xs text-ice/50">{detail}</span>
                   </span>

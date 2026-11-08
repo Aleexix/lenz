@@ -6,6 +6,7 @@ const isMac = navigator.userAgent.includes('Mac')
 const ACTION_LABELS: Record<ShortcutAction, string> = {
   newTab: 'Nueva pestaña',
   newAgent: 'Nuevo agente',
+  newTask: 'Nueva tarea',
   closePane: 'Cerrar panel',
   splitRight: 'Dividir a la derecha',
   splitDown: 'Dividir hacia abajo',

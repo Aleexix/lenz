@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react'
 import type { TerminalPane } from '../../../shared/workspace'
 import { useAgentStatus } from '../agents/agent-store'
 import { matchClipboard, matchShortcut } from '../workspace/shortcuts'
-import { useWorkspace } from '../workspace/workspace-store'
+import { agentPanes, useWorkspace } from '../workspace/workspace-store'
 import { LENZ_TERMINAL_THEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from './terminal-theme'
 
 interface Props {
@@ -114,6 +114,9 @@ export function TerminalView({ pane, focused }: Props) {
       if (disposed) return
       if (!replay) {
         const { cwd, agent } = paneRef.current
+        const home = agent
+          ? agentPanes(useWorkspace.getState().workspace).find(({ pane }) => pane.id === paneRef.current.id)
+          : undefined
         const info = agent
           ? await window.lenz.agents.launch({
               profileId: agent.profileId,
@@ -123,6 +126,7 @@ export function TerminalView({ pane, focused }: Props) {
               rows,
               // First start sends the task; later starts pick the conversation back up.
               ...(agent.sessionId ? { resumeSessionId: agent.sessionId } : { prompt: agent.prompt }),
+              ...(home?.space.kind === 'task' ? { trustFrom: home.project.path } : {}),
             })
           : await daemon.request('terminal.create', { cwd, cols, rows })
         if (disposed) {

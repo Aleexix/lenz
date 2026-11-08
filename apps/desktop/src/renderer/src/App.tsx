@@ -1,4 +1,4 @@
-import { FolderOpen } from 'lucide-react'
+import { FolderOpen, GitBranch } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { AppInfo, DaemonStatus } from '../../shared/app-info'
 import { syncAgentStatus } from './agents/agent-store'
@@ -6,18 +6,24 @@ import { NewAgentDialog } from './agents/NewAgentDialog'
 import { useAgentAttention } from './agents/use-agent-attention'
 import lenzMark from './assets/lenz-mark-white.svg'
 import { SettingsDialog } from './settings/SettingsDialog'
+import { NewTaskDialog } from './tasks/NewTaskDialog'
+import { useTaskSummaryRefresh } from './tasks/task-summaries'
 import { useUi } from './ui-store'
 import { PaneTree } from './workspace/PaneTree'
 import { pickAndOpenProject, Sidebar } from './workspace/Sidebar'
 import { matchShortcut, type ShortcutAction } from './workspace/shortcuts'
 import { TabBar } from './workspace/TabBar'
-import { activeProject, useWorkspace } from './workspace/workspace-store'
+import { activeProject, activeSpace, useWorkspace } from './workspace/workspace-store'
 
 const TITLE_BAR_HEIGHT = 40
 const SAVE_DELAY_MS = 300
 
 const SHORTCUT_HANDLERS: Record<ShortcutAction, () => void> = {
   newTab: () => useWorkspace.getState().newTab(),
+  newTask: () => {
+    const project = activeProject(useWorkspace.getState().workspace)
+    if (project) useUi.getState().openNewTask(project.id)
+  },
   newAgent: () => {
     if (activeProject(useWorkspace.getState().workspace)) useUi.getState().openDialog('newAgent')
   },
@@ -87,11 +93,13 @@ export function App() {
   const [info, setInfo] = useState<AppInfo | null>(null)
   const loaded = useWorkspace((state) => state.loaded)
   const project = useWorkspace((state) => activeProject(state.workspace))
+  const space = useWorkspace((state) => activeSpace(state.workspace))
   const daemonStatus = useDaemonStatus()
 
   usePersistedWorkspace()
   useShortcuts()
   useAgentAttention()
+  useTaskSummaryRefresh()
   useEffect(() => syncAgentStatus(), [])
 
   useEffect(() => {
@@ -109,9 +117,19 @@ export function App() {
         <img src={lenzMark} alt="" className="h-4 w-auto" draggable={false} />
         <span className="text-sm font-semibold tracking-tight">Lenz</span>
         {project && (
-          <span className="truncate text-sm text-ice/45">
+          <span className="flex min-w-0 items-center truncate text-sm text-ice/45">
             <span className="px-1.5 text-ice/25">/</span>
             {project.name}
+            {space?.kind === 'task' ? (
+              <>
+                <span className="px-1.5 text-ice/25">/</span>
+                <span className="text-ice/75">{space.name}</span>
+                <span className="ml-2 flex items-center gap-1 rounded bg-navy-800 px-1.5 py-0.5 font-mono text-[11px] text-electric-400">
+                  <GitBranch size={11} />
+                  {space.branch}
+                </span>
+              </>
+            ) : null}
           </span>
         )}
       </header>
@@ -124,6 +142,7 @@ export function App() {
       </div>
 
       <NewAgentDialog />
+      <NewTaskDialog />
       <SettingsDialog />
 
       <footer className="flex h-6 shrink-0 items-center justify-between border-t border-navy-800 px-3 font-mono text-[11px] text-ice/50">
@@ -135,20 +154,20 @@ export function App() {
 }
 
 function ProjectView() {
-  const project = useWorkspace((state) => activeProject(state.workspace))
-  if (!project) return null
-  const tab = project.tabs.find((candidate) => candidate.id === project.activeTabId)
+  const space = useWorkspace((state) => activeSpace(state.workspace))
+  if (!space) return null
+  const tab = space.tabs.find((candidate) => candidate.id === space.activeTabId)
 
   return (
     <>
-      <TabBar project={project} />
+      <TabBar space={space} />
       <div className="relative min-h-0 flex-1">
         {tab ? (
           // Only the visible tab is mounted; switching back re-attaches from lenzd's snapshot.
           <PaneTree key={tab.id} tab={tab} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-ice/50">
-            <p className="text-sm">No hay terminales abiertas en {project.name}.</p>
+            <p className="text-sm">No hay terminales abiertas en {space.name}.</p>
             <button
               type="button"
               onClick={() => useWorkspace.getState().newTab()}

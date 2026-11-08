@@ -76,7 +76,7 @@ lenz/
 
 ```
 Proyecto (un repo o carpeta, local o en una máquina SSH)
-└── Tarea  → worktree + rama propia (opcional: también puede ser la carpeta tal cual)
+└── Espacio: el principal (la carpeta del proyecto) o una tarea (worktree + rama propia)
     └── Tabs → Panes (terminal, agente, diff)
 ```
 
@@ -153,6 +153,16 @@ Un perfil = qué comando lanzar + qué variables de entorno inyectar.
 
 - "Nueva tarea" → crea rama + worktree y lanza el agente ahí.
 - Lista de tareas por proyecto; borrar tarea limpia la worktree.
+
+✅ Hecha (2026-11-08). Notas de implementación:
+
+- `workspace.json` pasa a la versión 2: cada proyecto tiene _espacios_ (el principal y uno por tarea) con sus pestañas. Los archivos v1 se migran solos al abrir.
+- La rama es `lenz/<nombre-de-la-tarea>` y el worktree vive junto al repo: `<repo>-worktrees/<nombre>`. Si el nombre ya existe se agrega `-2`, `-3`…
+- La barra lateral anida las tareas bajo su proyecto y muestra `●N` (archivos sin commit) y `↑N` (commits por delante de la rama base); se refresca cada 10 s y al enfocar la ventana.
+- Borrar una tarea cierra sus terminales y agentes, borra el worktree y, si se elige, la rama. Por defecto la rama se conserva.
+- **Confianza de carpeta de Claude Code:** cada worktree es una carpeta nueva y Claude preguntaría "¿confías en esta carpeta?", dejando la tarea detenida. Lenz copia al worktree la confianza que el repo ya tiene en `~/.claude.json` (con el mismo bloqueo de archivo que usa Claude). Si el repo no es de confianza, Claude pregunta como siempre.
+- Verificado en Windows con Claude Code real: tarea con agente → el agente hizo commit en su rama → `↑1` → borrado (carpeta y rama). También la migración v1 → v2.
+- Pendiente: mientras Claude muestra su pregunta de confianza (repo no confiable) el agente aparece "Inactivo", no "Te necesita", porque esa pantalla no dispara hooks.
 
 ### Fase 4 — Revisión
 

@@ -71,4 +71,6 @@ export interface LaunchAgentRequest {
   prompt?: string
   /** Resume this Claude Code session instead of starting a new one. */
   resumeSessionId?: string
+  /** For task worktrees: the repository whose Claude folder trust the worktree inherits. */
+  trustFrom?: string
 }
