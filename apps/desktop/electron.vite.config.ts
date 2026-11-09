@@ -19,7 +19,11 @@ export default defineConfig({
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     resolve: {
-      alias: { '@': resolve(__dirname, 'src/renderer/src') },
+      alias: {
+        '@': resolve(__dirname, 'src/renderer/src'),
+        // monaco-editor only exports its JS modules; the lean entry also needs its CSS files.
+        'monaco-editor-esm': resolve(__dirname, 'node_modules/monaco-editor/esm/vs'),
+      },
     },
     plugins: [react(), tailwindcss()],
   },

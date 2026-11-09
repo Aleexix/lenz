@@ -36,6 +36,10 @@ El CI (GitHub Actions) genera el `.exe` y el `.dmg` en cada push a `main`; se de
 
 En un proyecto git, **Nueva tarea** (icono de rama al pasar el mouse sobre el proyecto, o Ctrl+Shift+N / ⇧⌘N) crea una rama `lenz/<nombre>` y su propia carpeta (_worktree_) en `<repo>-worktrees/<nombre>`, y puede lanzar un agente ahí con una tarea. Así varios agentes trabajan en paralelo sin pisarse. La barra lateral muestra cada tarea bajo su proyecto con sus archivos sin commit (`●3`) y sus commits nuevos (`↑2`). Al borrar una tarea eliges si conservar su rama.
 
+## Revisar cambios
+
+**Cambios** (Ctrl+Shift+G / ⇧⌘G, o el botón de comparar arriba a la derecha) muestra lo que cambió en la tarea, archivo por archivo. Haz clic en un número de línea para dejar un comentario y luego **Enviar a <agente>** para que los aplique. Desde el mismo panel puedes hacer commit (Claude puede redactar el mensaje) y crear el pull request, que requiere [GitHub CLI](https://cli.github.com) con `gh auth login`.
+
 ## Agentes
 
 **Nuevo agente** (`+` en _Squad_, o Ctrl+Shift+A / ⇧⌘A) lanza Claude Code en el proyecto activo, con una tarea opcional. La barra lateral muestra a cada agente: **Trabajando**, **Te necesita** (pide permiso o tiene una pregunta), **Listo** (terminó y aún no lo miras), **Inactivo** o **Error**. Si un agente te necesita o termina mientras miras otra cosa, llega una notificación del sistema. Si reinicias el PC, al abrir Lenz cada agente retoma su conversación.
@@ -55,6 +59,7 @@ Las API keys se guardan cifradas por el sistema operativo.
 | Nueva pestaña                | Ctrl+Shift+T                                  | ⌘T       |
 | Nuevo agente                 | Ctrl+Shift+A                                  | ⇧⌘A      |
 | Nueva tarea                  | Ctrl+Shift+N                                  | ⇧⌘N      |
+| Ver cambios                  | Ctrl+Shift+G                                  | ⇧⌘G      |
 | Dividir a la derecha         | Ctrl+Shift+D                                  | ⌘D       |
 | Dividir hacia abajo          | Ctrl+Shift+E                                  | ⇧⌘D      |
 | Cerrar panel                 | Ctrl+Shift+W                                  | ⌘W       |

@@ -57,6 +57,8 @@ interface WorkspaceState {
   setTerminalId(paneId: string, terminalId: string, agent?: PaneAgent): void
   /** Starts an agent in a new tab, or beside the focused pane, in the active space. */
   launchAgent(agent: PaneAgent, placement: 'tab' | 'split'): void
+  /** Shows the active space's "Cambios" tab, creating it if needed. */
+  openReview(): void
   /** Shows the project, space and tab that hold `paneId` and focuses it. */
   revealPane(paneId: string): void
   setSplitSizes(tabId: string, splitId: string, sizes: number[]): void
@@ -376,6 +378,22 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       }
       return { workspace: mapActiveSpace(workspace, (s) => withTab(s, makeTab(s, agent))) }
     }),
+
+  openReview: () =>
+    set(({ workspace }) => ({
+      workspace: mapActiveSpace(workspace, (space) => {
+        const existing = space.tabs.find((tab) => tab.view === 'review')
+        if (existing) return { ...space, activeTabId: existing.id }
+        const tab: Tab = {
+          id: newId('tab'),
+          title: 'Cambios',
+          view: 'review',
+          root: { kind: 'split', id: newId('split'), direction: 'horizontal', children: [], sizes: [] },
+          focusedPaneId: '',
+        }
+        return withTab(space, tab)
+      }),
+    })),
 
   revealPane: (paneId) =>
     set(({ workspace }) => {

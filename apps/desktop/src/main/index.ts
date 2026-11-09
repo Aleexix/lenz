@@ -6,11 +6,13 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { AppInfo, DaemonReply, Platform } from '../shared/app-info'
 import type { CreateTaskRequest, RemoveTaskRequest } from '../shared/git'
 import type { LaunchAgentRequest, ProfileInput } from '../shared/profiles'
+import type { ChangedFile, PullRequestRequest } from '../shared/review'
 import type { Workspace } from '../shared/workspace'
 import { AgentLauncher } from './agent-launcher'
 import { enableDevToolsShortcut, installAppMenu } from './app-menu'
 import { inheritClaudeTrust } from './claude-trust'
 import { DaemonManager } from './daemon-manager'
+import { changeSet, commitAll, createPullRequest, draftMessage, fileVersions } from './git-review'
 import { createTaskWorktree, removeTaskWorktree, repoInfo, worktreeSummary } from './git-worktrees'
 import { ProfileStore } from './profile-store'
 import { WorkspaceStore } from './workspace-store'
@@ -151,6 +153,33 @@ function registerIpc(): void {
     const options = { title: 'Abrir proyecto', properties: ['openDirectory' as const] }
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
     return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
+
+  ipcMain.handle('review:changes', (_event, path: string, baseBranch?: string) =>
+    reply(() => changeSet(path, baseBranch)),
+  )
+  ipcMain.handle('review:file', (_event, path: string, baseRef: string, file: ChangedFile) =>
+    reply(() => fileVersions(path, baseRef, file)),
+  )
+  ipcMain.handle('review:commit', (_event, path: string, message: string) =>
+    reply(async () => {
+      const hash = await commitAll(path, message)
+      log(`commit ${hash} in ${path}`)
+      return hash
+    }),
+  )
+  ipcMain.handle('review:draft', (_event, path: string, baseRef: string, kind: 'commit' | 'pr') =>
+    reply(() => draftMessage(path, baseRef, kind)),
+  )
+  ipcMain.handle('review:pull-request', (_event, request: PullRequestRequest) =>
+    reply(async () => {
+      const result = await createPullRequest(request)
+      log(`pull request for ${request.branch}: ${result.kind === 'created' ? result.url : result.reason}`)
+      return result
+    }),
+  )
+  ipcMain.on('app:open-external', (_event, url: string) => {
+    if (/^https:\/\//.test(url)) void shell.openExternal(url)
   })
 
   ipcMain.handle('dialog:choose', async (event, message: string, detail: string, buttons: string[]) => {

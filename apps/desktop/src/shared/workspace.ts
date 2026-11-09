@@ -41,8 +41,10 @@ export type PaneNode = TerminalPane | SplitPane
 export interface Tab {
   id: string
   title: string
+  /** For `review` tabs, an empty split: they show the space's changes, not terminals. */
   root: PaneNode
   focusedPaneId: string
+  view?: 'review'
 }
 
 /**

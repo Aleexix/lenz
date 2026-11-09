@@ -1,4 +1,4 @@
-import { Bot, Columns2, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
+import { Bot, Columns2, FileDiff, GitCompare, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { Space, Tab } from '../../../shared/workspace'
 import { type DisplayState, displayState, mostUrgent, useAgentStatus } from '../agents/agent-store'
@@ -16,6 +16,9 @@ function useTabAgentState(tab: Tab): DisplayState | null {
 
 function TabIcon({ tab, active }: { tab: Tab; active: boolean }) {
   const state = useTabAgentState(tab)
+  if (tab.view === 'review') {
+    return <FileDiff size={13} className={`shrink-0 ${active ? 'text-electric-400' : ''}`} />
+  }
   if (state) {
     return (
       <span className="relative flex shrink-0">
@@ -28,7 +31,7 @@ function TabIcon({ tab, active }: { tab: Tab; active: boolean }) {
 }
 
 export function TabBar({ space }: { space: Space }) {
-  const { selectTab, closeTab, newTab, splitFocused } = useWorkspace.getState()
+  const { selectTab, closeTab, newTab, splitFocused, openReview } = useWorkspace.getState()
 
   return (
     <div className="flex h-9 shrink-0 items-stretch border-b border-navy-800 bg-navy-950">
@@ -66,6 +69,9 @@ export function TabBar({ space }: { space: Space }) {
         </IconButton>
       </div>
       <div className="flex items-center gap-0.5 px-2">
+        <IconButton title={`Ver cambios (${SHORTCUT_LABELS.openReview})`} onClick={openReview}>
+          <GitCompare size={15} />
+        </IconButton>
         <IconButton
           title={`Dividir a la derecha (${SHORTCUT_LABELS.splitRight})`}
           onClick={() => splitFocused('horizontal')}

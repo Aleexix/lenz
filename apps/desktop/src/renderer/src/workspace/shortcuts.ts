@@ -2,6 +2,7 @@ export type ShortcutAction =
   | 'newTab'
   | 'newAgent'
   | 'newTask'
+  | 'openReview'
   | 'closePane'
   | 'splitRight'
   | 'splitDown'
@@ -32,6 +33,8 @@ export function matchShortcut(event: KeyboardEvent): ShortcutAction | null {
         return event.shiftKey ? 'newAgent' : null
       case 'KeyN':
         return event.shiftKey ? 'newTask' : null
+      case 'KeyG':
+        return event.shiftKey ? 'openReview' : null
       case 'KeyW':
         return event.shiftKey ? null : 'closePane'
       case 'KeyD':
@@ -53,6 +56,8 @@ export function matchShortcut(event: KeyboardEvent): ShortcutAction | null {
       return 'newAgent'
     case 'KeyN':
       return 'newTask'
+    case 'KeyG':
+      return 'openReview'
     case 'KeyW':
       return 'closePane'
     case 'KeyD':
@@ -82,6 +87,7 @@ export const SHORTCUT_LABELS: Record<ShortcutAction, string> = isMac
       newTab: '⌘T',
       newAgent: '⇧⌘A',
       newTask: '⇧⌘N',
+      openReview: '⇧⌘G',
       closePane: '⌘W',
       splitRight: '⌘D',
       splitDown: '⇧⌘D',
@@ -93,6 +99,7 @@ export const SHORTCUT_LABELS: Record<ShortcutAction, string> = isMac
       newTab: 'Ctrl+Shift+T',
       newAgent: 'Ctrl+Shift+A',
       newTask: 'Ctrl+Shift+N',
+      openReview: 'Ctrl+Shift+G',
       closePane: 'Ctrl+Shift+W',
       splitRight: 'Ctrl+Shift+D',
       splitDown: 'Ctrl+Shift+E',

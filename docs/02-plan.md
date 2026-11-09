@@ -170,6 +170,16 @@ Un perfil = qué comando lanzar + qué variables de entorno inyectar.
 - Comentarios en líneas → se envían al agente como mensaje.
 - Commit y PR asistidos (vía `gh`).
 
+✅ Hecha (2026-11-09). Notas de implementación:
+
+- Pestaña **Cambios** por espacio (Ctrl+Shift+G / ⇧⌘G o el botón de comparar): lista de archivos y diff con Monaco. En una tarea compara contra el punto donde salió de su rama base (`merge-base`), incluyendo lo que aún no tiene commit y archivos nuevos; en el espacio principal, contra el último commit. Se actualiza cada 5 s.
+- Monaco va empaquetado (sin CDN) en una entrada propia sin los servicios de lenguaje (TypeScript, JSON, CSS, HTML): sólo resaltado de sintaxis, sin errores falsos ni workers de varios MB. Se carga la primera vez que se abre Cambios. Al actualizar `monaco-editor` hay que regenerar `review/monaco-lean.ts`.
+- Comentarios: clic en un número de línea (Shift+clic para varias) o "Comentar estas líneas" en el menú contextual. "Enviar a <agente>" escribe todos los comentarios como un solo mensaje (pegado entre corchetes de _bracketed paste_) en la terminal del agente.
+- Commit: "Redactar" pide el mensaje a `claude -p --model haiku` con el diff sin commit; "Commit" hace `git add -A` + `git commit`.
+- PR: "Preparar pull request" redacta título y descripción del mismo modo; "Crear PR" hace push y `gh pr create`. Sin `gh` (o sin sesión) avisa y no sube nada.
+- Verificado con Claude Code real en Windows: agente crea un archivo → diff → comentario en una línea → el agente lo aplica → mensaje redactado → commit en la rama → borrador del PR → aviso de `gh` faltante.
+- **Sin verificar:** crear un PR de verdad (no hay `gh` en este equipo) y todo en Mac.
+
 ### Fase 5 — SSH
 
 - Máquinas leídas de `~/.ssh/config` o agregadas a mano.

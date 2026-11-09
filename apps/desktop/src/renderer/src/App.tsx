@@ -1,5 +1,5 @@
 import { FolderOpen, GitBranch } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { AppInfo, DaemonStatus } from '../../shared/app-info'
 import { syncAgentStatus } from './agents/agent-store'
 import { NewAgentDialog } from './agents/NewAgentDialog'
@@ -16,10 +16,13 @@ import { TabBar } from './workspace/TabBar'
 import { activeProject, activeSpace, useWorkspace } from './workspace/workspace-store'
 
 const TITLE_BAR_HEIGHT = 40
+// Monaco is heavy: load the review view the first time a "Cambios" tab opens.
+const ReviewView = lazy(() => import('./review/ReviewView'))
 const SAVE_DELAY_MS = 300
 
 const SHORTCUT_HANDLERS: Record<ShortcutAction, () => void> = {
   newTab: () => useWorkspace.getState().newTab(),
+  openReview: () => useWorkspace.getState().openReview(),
   newTask: () => {
     const project = activeProject(useWorkspace.getState().workspace)
     if (project) useUi.getState().openNewTask(project.id)
@@ -162,7 +165,11 @@ function ProjectView() {
     <>
       <TabBar space={space} />
       <div className="relative min-h-0 flex-1">
-        {tab ? (
+        {tab?.view === 'review' ? (
+          <Suspense fallback={null}>
+            <ReviewView key={space.id} space={space} />
+          </Suspense>
+        ) : tab ? (
           // Only the visible tab is mounted; switching back re-attaches from lenzd's snapshot.
           <PaneTree key={tab.id} tab={tab} />
         ) : (

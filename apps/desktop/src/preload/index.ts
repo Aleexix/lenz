@@ -9,6 +9,13 @@ import type {
   WorktreeSummary,
 } from '../shared/git'
 import type { LaunchAgentRequest, ProfileInput, ProviderProfile } from '../shared/profiles'
+import type {
+  ChangedFile,
+  ChangeSet,
+  FileVersions,
+  PullRequestRequest,
+  PullRequestResult,
+} from '../shared/review'
 import type { Workspace } from '../shared/workspace'
 
 function on<A extends unknown[]>(channel: string, listener: (...args: A) => void): () => void {
@@ -59,6 +66,20 @@ const lenz = {
       call('git:summary', path, baseBranch),
     removeTask: (request: RemoveTaskRequest): Promise<void> => call('git:remove-task', request),
   },
+
+  review: {
+    changes: (path: string, baseBranch?: string): Promise<ChangeSet> =>
+      call('review:changes', path, baseBranch),
+    file: (path: string, baseRef: string, file: ChangedFile): Promise<FileVersions> =>
+      call('review:file', path, baseRef, file),
+    commit: (path: string, message: string): Promise<string> => call('review:commit', path, message),
+    draft: (path: string, baseRef: string, kind: 'commit' | 'pr'): Promise<string> =>
+      call('review:draft', path, baseRef, kind),
+    pullRequest: (request: PullRequestRequest): Promise<PullRequestResult> =>
+      call('review:pull-request', request),
+  },
+
+  openExternal: (url: string): void => ipcRenderer.send('app:open-external', url),
 
   workspace: {
     load: (): Promise<Workspace | null> => ipcRenderer.invoke('workspace:load'),

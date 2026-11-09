@@ -14,7 +14,7 @@ export const TASK_BRANCH_PREFIX = 'lenz/'
 
 export class GitError extends Error {}
 
-function git(cwd: string, args: string[]): Promise<string> {
+export function git(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       'git',
@@ -38,7 +38,7 @@ function git(cwd: string, args: string[]): Promise<string> {
   })
 }
 
-function lines(output: string): string[] {
+export function lines(output: string): string[] {
   return output
     .split(/\r?\n/)
     .map((line) => line.trim())

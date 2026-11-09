@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile)
  * Inherited by an agent (Lenz opened from a Claude terminal), they make it
  * think it is a sub-session: no transcript, so no resume.
  */
-const PARENT_SESSION_ENV = [
+export const PARENT_SESSION_ENV = [
   'CLAUDECODE',
   'CLAUDE_CODE_CHILD_SESSION',
   'CLAUDE_CODE_SESSION_ID',
@@ -31,7 +31,7 @@ const PARENT_SESSION_ENV = [
 ]
 
 /** How to start `claude` on this machine: the executable plus any wrapper arguments. */
-interface ClaudeCommand {
+export interface ClaudeCommand {
   prefix: string[]
 }
 
@@ -40,7 +40,7 @@ interface ClaudeCommand {
  * (npm) on PATH. macOS/Linux: whatever the login shell finds, since apps
  * opened from the Dock don't get the shell's PATH.
  */
-async function findClaude(): Promise<ClaudeCommand | null> {
+export async function findClaude(): Promise<ClaudeCommand | null> {
   if (process.platform === 'win32') {
     const dirs = (process.env.PATH ?? '').split(delimiter).filter(Boolean)
     const home = process.env.USERPROFILE

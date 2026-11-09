@@ -33,6 +33,20 @@
   }
 }
 
+.lenz-comment-glyph::before {
+  content: "";
+  display: block;
+  width: 8px;
+  height: 8px;
+  margin: 5px 0 0 6px;
+  border-radius: 9999px;
+  background: var(--color-electric-400);
+}
+
+.lenz-commented-line {
+  background: rgb(47 107 240 / 0.12);
+}
+
 @utility drag-region {
   -webkit-app-region: drag;
 }
