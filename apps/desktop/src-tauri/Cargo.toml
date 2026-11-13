@@ -1,0 +1,23 @@
+[package]
+name = "lenz-desktop"
+description = "Backend Tauri de Lenz: comandos y cliente del daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "lenz_desktop_lib"
+crate-type = ["rlib"]
+doctest = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+lenz-protocol.workspace = true
+tauri = { version = "2", features = [] }
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["sync", "time", "io-util"] }
+tracing.workspace = true

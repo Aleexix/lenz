@@ -1,0 +1,49 @@
+name: Release
+
+# Se publica al hacer push de un tag: git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: --target universal-apple-darwin --config src-tauri/tauri.release.conf.json
+          - os: windows-latest
+            args: --config src-tauri/tauri.release.conf.json
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+
+      - run: pnpm install --frozen-lockfile
+
+      # Sin certificados de pago: Windows sin firmar y macOS con firma ad-hoc
+      # (signingIdentity "-" en tauri.conf.json). Ver ARQUITECTURA.md §15.
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: Lenz ${{ github.ref_name }}
+          releaseBody: Instrucciones de instalación en el README.
+          releaseDraft: true
+          args: ${{ matrix.args }}

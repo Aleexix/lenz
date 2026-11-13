@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/* Tokens de marca: lenz-brand/BRAND.md
+ * `static`: se emiten siempre como variables CSS, aunque ninguna clase las use,
+ * para que el código (p. ej. el océano del inicio) pueda leerlas en tiempo de ejecución. */
+@theme static {
+  --color-navy-975: #050b22; /* fondo del océano y de las barras */
+  --color-navy-950: #070e2b;
+  --color-navy-900: #0d1a45; /* superficies elevadas (tarjetas, nodos) */
+  --color-navy-800: #1a2f6e;
+  --color-electric-600: #2f6bf0;
+  --color-electric-400: #5b9bff;
+  --color-ice: #eef3fd;
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+}
+
+/* Colores del océano ASCII de la pantalla de inicio (home/ocean-theme.ts).
+ * Derivan de la marca: si cambia el tema de la app, el océano se adapta solo. */
+:root {
+  --ocean-background: var(--color-navy-950);
+  --ocean-grid: var(--color-electric-400);
+  --ocean-fish: var(--color-ice);
+  --ocean-wake: var(--color-electric-400);
+  --ocean-shark: var(--color-electric-400);
+  --ocean-accent-1: var(--color-electric-400);
+  --ocean-accent-2: var(--color-electric-600);
+  --ocean-accent-3: var(--color-ice);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-navy-950);
+  color: var(--color-ice);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

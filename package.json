@@ -1,0 +1,21 @@
+{
+  "name": "lenz",
+  "private": true,
+  "packageManager": "pnpm@10.12.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "cargo build -p lenz-daemon && pnpm --filter @lenz/desktop dev",
+    "dev:web": "pnpm --filter @lenz/desktop dev:web",
+    "daemon:stop": "cargo run -q -p lenz-daemon -- --stop",
+    "build": "pnpm --filter @lenz/desktop build",
+    "typecheck": "pnpm --filter @lenz/desktop typecheck",
+    "lint": "biome check . && cargo clippy --workspace --all-targets -- -D warnings",
+    "format": "biome check --write . && cargo fmt --all",
+    "test": "pnpm --filter @lenz/desktop test && cargo test --workspace"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0"
+  }
+}

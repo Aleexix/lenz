@@ -1,0 +1,20 @@
+[package]
+name = "lenz-daemon"
+description = "Sidecar de Lenz: PTYs, scrollback, SQLite, git y hooks de agentes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lenz-protocol.workspace = true
+anyhow.workspace = true
+dirs.workspace = true
+portable-pty.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+# Se agregan al implementar cada módulo (ver ARQUITECTURA.md §3.1): alacritty_terminal, rusqlite
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "io-util"] }
